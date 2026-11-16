@@ -116,19 +116,22 @@ function friendlyError(status, data) {
 
 /* ── descoberta automática ──────────────────────────────── */
 
+let lastMotorOk = null;
 function statusMotor(ok) {
+  if (ok === lastMotorOk && $('motor-state')) return;
+  lastMotorOk = ok;
   const pill = $('motor-pill');
   if (pill) {
-    pill.className = 'status-pill ' + (ok ? 'ok' : 'wait');
-    $('motor-pill-text').textContent = ok ? 'Motor pronto para renderizar' : 'Aguardando inicialização do motor…';
+    pill.className = 'status-pill ' + (ok ? 'ok' : 'hybrid');
+    $('motor-pill-text').textContent = ok ? 'Motor pronto para renderizar' : 'Modo híbrido · chat ativo';
   }
   const st = $('motor-state');
   if (st) {
-    st.className = 'motor-state ' + (ok ? 'ok' : 'wait');
-    $('motor-state-text').textContent = ok ? 'Pronto para renderizar' : 'Aguardando…';
+    st.className = 'motor-state ' + (ok ? 'ok' : 'hybrid');
+    $('motor-state-text').textContent = ok ? 'Pronto para renderizar' : 'Motor em inicialização';
     $('motor-sub').textContent = ok
       ? `${motor && motor.modelo ? motor.modelo : 'wan2.1'} · GPU · S3 24h`
-      : 'descoberto via motor.json · S3 24h';
+      : 'chat e prompts ativos · vídeo entra na fila ao subir';
   }
 }
 
@@ -151,6 +154,7 @@ async function cicloMotor() {
   motor = novo;
   statusMotor(Boolean(novo));
   if (mudou) {
+    if (novo && $('motor-hint')) $('motor-hint').textContent = 'O botão gerencia a fila e o polling sozinho.';
     if (pendente) {
       const p = pendente;
       pendente = null;
@@ -315,7 +319,7 @@ async function askAI(messages) {
   return null;
 }
 
-function addMsg(autor, texto, acao, origem) {
+function addMsg(autor, texto, acao, origem, provedor) {
   const wrap = document.createElement('div');
   wrap.className = 'msg ' + autor;
 
@@ -335,7 +339,8 @@ function addMsg(autor, texto, acao, origem) {
   if (origem === 'ia') {
     const tag = document.createElement('span');
     tag.className = 'src-tag';
-    tag.textContent = 'IA';
+    tag.textContent = provedor ? `IA · ${provedor}` : 'IA';
+    if (provedor) tag.title = 'Gerado por ' + provedor;
     bubble.append(tag, document.createElement('br'));
   }
   bubble.append(document.createTextNode(texto));
@@ -409,7 +414,7 @@ async function enviarChat(texto) {
   }
 
   chatHistory.push({ role: 'assistant', content: reply });
-  addMsg('assistant', reply, acao, origem);
+  addMsg('assistant', reply, acao, origem, ai ? ai.provedor : '');
 }
 
 function autoGrowChat() {
@@ -552,9 +557,11 @@ function create() {
   const p = coletarPedido();
   if (!p) return;
   if (!motor) {
+    const primeiro = !pendente;
     pendente = p;
     statusMotor(false);
-    toast('Aguardando inicialização do motor…');
+    $('motor-hint').textContent = 'Pedido na fila · envio automático assim que o motor subir.';
+    if (primeiro) toast('Modo híbrido: pedido na fila. O chat continua ativo.');
     return;
   }
   enviarPedido(p);
@@ -978,6 +985,10 @@ window.addEventListener('resize', () => {
   clearTimeout(window.__erResize);
   window.__erResize = setTimeout(desenharConexoes, 120);
 });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) cicloMotor();
+});
+window.addEventListener('focus', cicloMotor);
 window.addEventListener('beforeunload', persistJobs);
 
 $('login-form').addEventListener('submit', (e) => {

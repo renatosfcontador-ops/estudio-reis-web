@@ -1,15 +1,16 @@
 {
   "produto": "Estúdio Reis Atualizado",
-  "versao": "v2.3.0",
-  "BUILD_NUMBER": 230,
+  "versao": "v2.4.0",
+  "BUILD_NUMBER": 240,
   "data": "2026-11-16",
   "branch": "main",
   "publicadoEm": "2026-11-16",
-  "commitBase": "chat-ia-real-netlify-function-build-230",
+  "commitBase": "cascata-multi-motor-build-240",
   "ia": {
-    "provedor": "OpenAI-compativel (Groq/OpenRouter/Gemini)",
     "funcao": "/.netlify/functions/chat",
-    "variaveis": ["AI_API_KEY", "AI_BASE_URL", "AI_MODEL"],
+    "cascata": ["groq", "openrouter", "huggingface", "openai", "gemini"],
+    "tiers": { "1": ["groq", "openrouter"], "2": ["huggingface"], "3": ["openai", "gemini"] },
+    "variaveis": ["GROQ_API_KEY", "OPENROUTER_API_KEY", "HF_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"],
     "fallback": "assistente local estruturado"
   },
   "descoberta": {

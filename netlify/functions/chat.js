@@ -1,17 +1,68 @@
 'use strict';
 
-// Estúdio Reis · proxy de IA conversacional (Netlify Function).
+// Estúdio Reis · chat com cascata multi-motor (Netlify Function).
 //
-// A chave NUNCA vai para o front-end. Ela vive nas variáveis de ambiente do site:
-//   AI_API_KEY     (ou GROQ_API_KEY / LLAMA_API_KEY)
-//   AI_BASE_URL    padrão: https://api.groq.com/openai/v1
-//   AI_MODEL       padrão: llama-3.3-70b-versatile
+// Estratégia Chain of Responsibility: tenta provedores em ordem, do mais barato/rápido
+// ao premium, e devolve o primeiro que responder. A chave NUNCA vai para o front-end.
 //
-// O front-end chama POST /.netlify/functions/chat com { messages: [...] }.
-// Resposta: { ok:true, reply, roteiro } ou { ok:false, reason }.
+// Variáveis de ambiente (todas opcionais; sem chave, o provedor é pulado):
+//   Nível 1 (gratuitos/rápidos)
+//     GROQ_API_KEY          + AI_GROQ_MODEL          (padrão llama-3.3-70b-versatile)
+//     OPENROUTER_API_KEY    + AI_OPENROUTER_MODEL    (padrão meta-llama/llama-3.3-70b-instruct:free)
+//     AI_API_KEY            (alias genérico de GROQ_API_KEY)
+//   Nível 2 (apoio leve)
+//     HF_API_KEY            + AI_HF_MODEL            (padrão meta-llama/Llama-3.3-70B-Instruct)
+//   Nível 3 (premium)
+//     OPENAI_API_KEY        + AI_OPENAI_MODEL        (padrão gpt-4o-mini)
+//     GEMINI_API_KEY        + AI_GEMINI_MODEL        (padrão gemini-2.0-flash)
+//
+// Bases configuráveis: AI_GROQ_BASE_URL, AI_OPENROUTER_BASE_URL, AI_HF_BASE_URL,
+//                      AI_OPENAI_BASE_URL, AI_GEMINI_BASE_URL.
 
-const DEFAULT_BASE = 'https://api.groq.com/openai/v1';
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
+const env = (k, d) => (process.env[k] ? String(process.env[k]) : d);
+
+const PROVIDERS = [
+  {
+    name: 'groq',
+    tier: 1,
+    baseUrl: env('AI_GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+    key: env('GROQ_API_KEY', env('AI_API_KEY', '')),
+    model: env('AI_GROQ_MODEL', 'llama-3.3-70b-versatile'),
+    timeout: 18000,
+  },
+  {
+    name: 'openrouter',
+    tier: 1,
+    baseUrl: env('AI_OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+    key: env('OPENROUTER_API_KEY', ''),
+    model: env('AI_OPENROUTER_MODEL', 'meta-llama/llama-3.3-70b-instruct:free'),
+    timeout: 20000,
+  },
+  {
+    name: 'huggingface',
+    tier: 2,
+    baseUrl: env('AI_HF_BASE_URL', 'https://router.huggingface.co/v1'),
+    key: env('HF_API_KEY', env('HUGGINGFACE_API_KEY', '')),
+    model: env('AI_HF_MODEL', 'meta-llama/Llama-3.3-70B-Instruct'),
+    timeout: 22000,
+  },
+  {
+    name: 'openai',
+    tier: 3,
+    baseUrl: env('AI_OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+    key: env('OPENAI_API_KEY', ''),
+    model: env('AI_OPENAI_MODEL', 'gpt-4o-mini'),
+    timeout: 20000,
+  },
+  {
+    name: 'gemini',
+    tier: 3,
+    baseUrl: env('AI_GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai'),
+    key: env('GEMINI_API_KEY', env('GOOGLE_API_KEY', '')),
+    model: env('AI_GEMINI_MODEL', 'gemini-2.0-flash'),
+    timeout: 20000,
+  },
+];
 
 const HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -31,22 +82,63 @@ const SYSTEM_PROMPT = [
   'Não invente dados técnicos nem parâmetros que não existam.',
 ].join(' ');
 
-function json(statusCode, body) {
-  return { statusCode, headers: HEADERS, body: JSON.stringify(body) };
+const json = (statusCode, body) => ({ statusCode, headers: HEADERS, body: JSON.stringify(body) });
+
+function normalizarRoteiro(r) {
+  const o = r && typeof r === 'object' ? r : {};
+  const estilo = typeof o.estilo === 'string' ? o.estilo : '';
+  const validos = ['realista', 'cinematografico', 'animacao_3d', 'anime', 'cyberpunk'];
+  return {
+    cena: typeof o.cena === 'string' ? o.cena.slice(0, 1200) : '',
+    protagonista: typeof o.protagonista === 'string' ? o.protagonista.slice(0, 120) : '',
+    antagonista: typeof o.antagonista === 'string' ? o.antagonista.slice(0, 120) : '',
+    estilo: validos.includes(estilo) ? estilo : 'realista',
+  };
+}
+
+async function chamarProvedor(p, messages) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), p.timeout || 20000);
+  try {
+    const res = await fetch(`${p.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${p.key}` },
+      body: JSON.stringify({
+        model: p.model,
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+        temperature: 0.7,
+        max_tokens: 900,
+        response_format: { type: 'json_object' },
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status}: ${detail.slice(0, 160)}`);
+    }
+    const data = await res.json();
+    const raw = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+    if (parsed && typeof parsed.reply === 'string' && parsed.reply.trim()) {
+      return { reply: parsed.reply.slice(0, 4000), roteiro: normalizarRoteiro(parsed.roteiro) };
+    }
+    if (raw && String(raw).trim()) {
+      return { reply: String(raw).slice(0, 4000), roteiro: null };
+    }
+    throw new Error('resposta vazia');
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: HEADERS, body: '' };
-  }
-  if (event.httpMethod !== 'POST') {
-    return json(405, { ok: false, reason: 'method' });
-  }
-
-  const key = process.env.AI_API_KEY || process.env.GROQ_API_KEY || process.env.LLAMA_API_KEY;
-  if (!key) {
-    return json(200, { ok: false, reason: 'no_key' });
-  }
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: HEADERS, body: '' };
+  if (event.httpMethod !== 'POST') return json(405, { ok: false, reason: 'method' });
 
   let body;
   try {
@@ -66,63 +158,35 @@ exports.handler = async (event) => {
     return json(400, { ok: false, reason: 'empty' });
   }
 
-  const base = (process.env.AI_BASE_URL || DEFAULT_BASE).replace(/\/+$/, '');
-  const model = process.env.AI_MODEL || DEFAULT_MODEL;
+  const tentativas = [];
+  const provedoresAtivos = PROVIDERS.filter((p) => p.key);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  if (!provedoresAtivos.length) {
+    return json(200, { ok: false, reason: 'no_key', provedores: PROVIDERS.map((p) => p.name) });
+  }
 
-  try {
-    const res = await fetch(`${base}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
-        temperature: 0.7,
-        max_tokens: 900,
-        response_format: { type: 'json_object' },
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      return json(200, { ok: false, reason: 'upstream', status: res.status, detail: detail.slice(0, 200) });
-    }
-
-    const data = await res.json();
-    const raw = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
-
-    let parsed = null;
+  for (const p of provedoresAtivos) {
+    const inicio = Date.now();
     try {
-      parsed = JSON.parse(raw);
-    } catch {
-      parsed = null;
-    }
-
-    if (parsed && typeof parsed.reply === 'string' && parsed.reply.trim()) {
-      const r = parsed.roteiro && typeof parsed.roteiro === 'object' ? parsed.roteiro : {};
+      const r = await chamarProvedor(p, messages);
+      const ms = Date.now() - inicio;
+      console.log(`[chat] provedor=${p.name} tier=${p.tier} ${ms}ms`);
+      tentativas.push({ provedor: p.name, tier: p.tier, status: 'ok', ms });
       return json(200, {
         ok: true,
-        reply: parsed.reply.slice(0, 4000),
-        roteiro: {
-          cena: typeof r.cena === 'string' ? r.cena.slice(0, 1200) : '',
-          protagonista: typeof r.protagonista === 'string' ? r.protagonista.slice(0, 120) : '',
-          antagonista: typeof r.antagonista === 'string' ? r.antagonista.slice(0, 120) : '',
-          estilo: typeof r.estilo === 'string' ? r.estilo : '',
-        },
+        reply: r.reply,
+        roteiro: r.roteiro,
+        provedor: p.name,
+        tier: p.tier,
+        tentativas,
       });
+    } catch (err) {
+      const ms = Date.now() - inicio;
+      const motivo = String((err && err.message) || err).slice(0, 200);
+      console.log(`[chat] provedor=${p.name} tier=${p.tier} falhou ${ms}ms: ${motivo}`);
+      tentativas.push({ provedor: p.name, tier: p.tier, status: 'erro', ms, motivo });
     }
-
-    return json(200, { ok: true, reply: String(raw).slice(0, 4000), roteiro: null });
-  } catch (err) {
-    clearTimeout(timer);
-    const aborted = err && err.name === 'AbortError';
-    return json(200, { ok: false, reason: aborted ? 'timeout' : 'network' });
   }
+
+  return json(200, { ok: false, reason: 'all_failed', tentativas });
 };

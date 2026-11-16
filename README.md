@@ -38,6 +38,19 @@ JSON em segundo plano (a cada 8 s) e conecta sozinho:
   motor…”**. Se o usuário tocar em **Criar Vídeo** nesse momento, o pedido fica pendente e é
   enviado automaticamente assim que o motor aparecer — sem nenhuma ação do usuário.
 
+## Chat com IA (cascata multi-motor)
+
+O chat usa a Netlify Function `/.netlify/functions/chat`. A chave **nunca** vai para o navegador.
+
+Configure no Netlify (*Site configuration → Environment variables*) — todas opcionais:
+- **Nível 1 (gratuito/rápido)**: `GROQ_API_KEY`, `OPENROUTER_API_KEY`
+- **Nível 2 (apoio)**: `HF_API_KEY`
+- **Nível 3 (premium)**: `OPENAI_API_KEY`, `GEMINI_API_KEY`
+
+A função tenta **Groq → OpenRouter → HuggingFace → OpenAI → Gemini**. Sem nenhuma chave, o chat
+cai no **assistente local estruturado** — o usuário nunca fica sem resposta. Quando o motor GPU
+está offline, a barra mostra **“Modo híbrido · chat ativo”** e o chat/prompts seguem funcionando.
+
 ## Como o pedido vira vídeo
 
 0. O front-end descobre o motor (JSON público) e usa `url` + `token` sem intervenção.

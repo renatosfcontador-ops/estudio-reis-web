@@ -2,6 +2,29 @@
 
 Formato: Keep a Changelog · Versões seguem `version.json` (a build de número MAIOR é a soberana).
 
+## [2.4.0] — build 240 — 2026-11-16
+
+### Adicionado
+- **Cascata multi-motor (Chain of Responsibility)** na função `/.netlify/functions/chat`:
+  - **Nível 1** (gratuito/rápido): **Groq** (Llama) → **OpenRouter** (modelos free).
+  - **Nível 2** (apoio leve): **HuggingFace Router**.
+  - **Nível 3** (premium): **OpenAI** (GPT) → **Gemini**.
+  - Cada provedor tem `timeout` próprio; falhas/timeouts alternam automaticamente; a resposta
+    informa `provedor`, `tier` e `tentativas`.
+- **Status híbrido sem “lenga-lenga”**: com o motor offline, a barra mostra **“Modo híbrido ·
+  chat ativo”** (o chat e os prompts continuam funcionando via cascata). “Criar Vídeo” coloca o
+  pedido na fila e envia automaticamente quando o motor fica verde.
+- **Refresh inteligente**: descoberta imediata ao voltar o foco/aba e ao abrir a janela; o status
+  só é re-renderizado quando muda.
+- Selo **IA · provedor** nas respostas (transparência do motor usado).
+
+### Segurança
+- Chaves apenas no ambiente do Netlify (`GROQ_API_KEY`, `OPENROUTER_API_KEY`, `HF_API_KEY`,
+  `OPENAI_API_KEY`, `GEMINI_API_KEY`); nenhuma chave no front-end.
+
+### Alterado
+- `version.json` → `v2.4.0` (build 240).
+
 ## [2.3.0] — build 230 — 2026-11-16
 
 ### Adicionado
