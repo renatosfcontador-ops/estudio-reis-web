@@ -359,19 +359,26 @@ function responder(texto) {
   };
 }
 
+const AI_ENDPOINTS = [
+  '/.netlify/functions/chat',
+  'https://estudio-reis.netlify.app/.netlify/functions/chat',
+];
+
 async function askAI(messages) {
-  try {
-    const res = await fetch('/.netlify/functions/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: messages.slice(-10) }),
-    });
-    const ct = res.headers.get('content-type') || '';
-    if (!ct.includes('application/json')) return null;
-    const data = await res.json();
-    if (data && data.ok && typeof data.reply === 'string' && data.reply.trim()) return data;
-  } catch {
-    /* sem função/chave: usa o assistente local */
+  for (const endpoint of AI_ENDPOINTS) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messages.slice(-10) }),
+      });
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) continue;
+      const data = await res.json();
+      if (data && data.ok && typeof data.reply === 'string' && data.reply.trim()) return data;
+    } catch {
+      /* tenta o próximo endpoint */
+    }
   }
   return null;
 }
@@ -384,7 +391,7 @@ function addMsg(autor, texto, acao, origem, provedor) {
   avatar.className = 'avatar';
   if (autor === 'assistant') {
     const img = document.createElement('img');
-    img.src = '/brand/isotipo/studio-reis-isotipo.svg';
+    img.src = 'brand/isotipo/studio-reis-isotipo.svg';
     img.alt = '';
     avatar.append(img);
   } else {
