@@ -1,0 +1,12 @@
+/* Studio Reis — tokens do enxoval de marca (Claude Design). */
+:root {
+  --sr-lime: #A5B494; --sr-lime-alt: #91A587; --sr-lime-hover: #B6C2A8; --sr-lime-press: #879777;
+  --sr-lime-a10: rgba(165, 180, 148, .10); --sr-lime-a25: rgba(165, 180, 148, .18); --sr-lime-a45: rgba(165, 180, 148, .28);
+  --sr-bg: #0D0F12; --sr-surface: #16191E; --sr-surface-2: #1E232A; --sr-border: #2A3038;
+  --sr-titanium: #94A3B8; --sr-text: #E2E8F0; --sr-muted: #94A3B8; --sr-on-lime: #0D0F12; --sr-danger: #FF4D5E;
+  --sr-radius-sm: 6px; --sr-radius: 12px; --sr-radius-lg: 18px;
+  --sr-glow: 0 0 0 1px var(--sr-lime-a25), 0 4px 14px rgba(0, 0, 0, .18);
+  --sr-glow-strong: 0 0 0 1px var(--sr-lime-a45), 0 6px 18px rgba(0, 0, 0, .22);
+  --sr-font: 'Inter Tight', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --sr-ease: cubic-bezier(.2, .7, .2, 1);
+}

@@ -1,0 +1,22 @@
+{
+  "produto": "Estúdio Reis Atualizado",
+  "versao": "v2.0.0",
+  "BUILD_NUMBER": 200,
+  "data": "2026-11-16",
+  "branch": "main",
+  "publicadoEm": "2026-11-16",
+  "commitBase": "unificacao-marca-build-200",
+  "repositorios": {
+    "base": "Est-dio-Reis-atualiza-o",
+    "marca": "studio-reis-canvas",
+    "motor": "estudio-reis-motor-wan"
+  },
+  "motor": {
+    "familia": "Wan2.1",
+    "modeloPadrao": "wan2.2-ti2v-5b",
+    "fallback": "wan2.1-t2v-1.3b",
+    "contrato": "POST /api/render -> GET /api/render/{id} -> /files/{nome}.mp4",
+    "retencaoHoras": 24
+  },
+  "regra": "A build de numero MAIOR e a soberana (mais recente). Toda alteracao, funcao nova ou correcao no Estudio Reis Atualizado incrementa o BUILD_NUMBER e o patch, com a entrada enumerada no CHANGELOG.md. Mantenha a marca sincronizada com studio-reis-canvas."
+}

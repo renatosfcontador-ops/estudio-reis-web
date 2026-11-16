@@ -1,0 +1,13 @@
+# Exported by three-d-stage
+newmtl graphite
+Kd 0.0103 0.0152 0.0110
+Ks 0.2000 0.2000 0.2000
+Ns 90
+d 1.0000
+
+newmtl lime
+Kd 0.0409 1.0000 0.0070
+Ks 0.2000 0.2000 0.2000
+Ns 130
+d 1.0000
+
