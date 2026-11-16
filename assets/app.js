@@ -1340,6 +1340,21 @@ document.querySelectorAll('[data-plano]').forEach((b) => {
 const brandApp = document.querySelector('#app-shell .brand');
 if (brandApp) brandApp.addEventListener('click', (e) => { e.preventDefault(); showLanding(); });
 
+document.querySelectorAll('.reveal-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.target);
+    if (!input) return;
+    const mostrar = input.type === 'password';
+    input.type = mostrar ? 'text' : 'password';
+    const label = mostrar ? 'Ocultar senha' : 'Mostrar senha';
+    btn.setAttribute('aria-pressed', String(mostrar));
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+});
+
 $('login-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const email = $('login-email').value.trim().toLowerCase();

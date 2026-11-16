@@ -1,11 +1,11 @@
 {
   "produto": "Estúdio Reis Atualizado",
-  "versao": "v2.7.0",
-  "BUILD_NUMBER": 270,
+  "versao": "v2.7.1",
+  "BUILD_NUMBER": 271,
   "data": "2026-11-16",
   "branch": "main",
   "publicadoEm": "2026-11-16",
-  "commitBase": "migracao-aws-purga-netlify-build-270",
+  "commitBase": "login-ui-reveal-build-271",
   "infra": {
     "hospedagem": "AWS EC2 3.18.191.22 (Nginx 1.28 + Let's Encrypt)",
     "dominio": "studioreis.reisconsultoriacontabil.com.br",

@@ -2,6 +2,15 @@
 
 Formato: Keep a Changelog · Versões seguem `version.json` (a build de número MAIOR é a soberana).
 
+## [2.7.1] — build 271 — 2026-11-16
+
+### Corrigido
+- **Login**: input de e-mail sem validação nativa conflitante (múltiplos `@`), `type=text` + `inputmode=email`, `novalidate` no form; padding/altura corrigidos (sem sobreposição).
+- **Botão de revelar senha** (ícone de olho) no campo de senha, alternando `password`/`text`.
+
+### Alterado
+- `version.json` → `v2.7.1` (build 271). Assets `?v=271`.
+
 ## [2.7.0] — build 270 — 2026-11-16
 
 ### Migração de infraestrutura (puração do Netlify)
