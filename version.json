@@ -1,11 +1,18 @@
 {
   "produto": "Estúdio Reis Atualizado",
-  "versao": "v2.6.0",
-  "BUILD_NUMBER": 260,
+  "versao": "v2.7.0",
+  "BUILD_NUMBER": 270,
   "data": "2026-11-16",
   "branch": "main",
   "publicadoEm": "2026-11-16",
-  "commitBase": "landing-precos-8-planos-build-260",
+  "commitBase": "migracao-aws-purga-netlify-build-270",
+  "infra": {
+    "hospedagem": "AWS EC2 3.18.191.22 (Nginx 1.28 + Let's Encrypt)",
+    "dominio": "studioreis.reisconsultoriacontabil.com.br",
+    "diretorio": "/var/www/studio-reis/estudio-reis-atualizacao",
+    "ia": "serviço local 127.0.0.1:8099 (/api/chat)",
+    "netlify": "removido"
+  },
   "planos": {
     "moeda": "USD",
     "quantidade": 8,

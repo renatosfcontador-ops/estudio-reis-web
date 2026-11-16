@@ -364,10 +364,7 @@ function responder(texto) {
   };
 }
 
-const AI_ENDPOINTS = [
-  '/.netlify/functions/chat',
-  'https://estudio-reis.netlify.app/.netlify/functions/chat',
-];
+const AI_ENDPOINTS = ['/api/chat'];
 
 async function askAI(messages) {
   for (const endpoint of AI_ENDPOINTS) {

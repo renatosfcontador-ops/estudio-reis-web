@@ -20,12 +20,12 @@ npx serve .
 Abra a URL. O endereço do motor é **descoberto automaticamente** (veja abaixo) —
 não existe tela para digitar URL ou token do motor.
 
-## Publicar no Netlify
+## Publicar (AWS EC2 + Nginx)
 
-- **Arrastar e soltar**: `netlify deploy --prod --dir .` (netlify-cli), ou
-  arraste a pasta no painel do Netlify.
-- Build: nenhum. Publish directory: `.`.
-- O `netlify.toml` já traz o fallback SPA (`_redirects`) e os headers de segurança.
+- Build: nenhum. Publique a pasta em `/var/www/studio-reis/estudio-reis-atualizacao` no engine EC2.
+- Nginx: vhost `studioreis.reisconsultoriacontabil.com.br` (SSL Let's Encrypt) servindo o diretório e
+  `/api/chat` → serviço local `127.0.0.1:8099` (`/opt/estudio-reis/ai-chat.js`).
+- **Netlify removido**: o projeto não depende mais de `netlify.toml`, `_redirects` ou funções Netlify.
 
 ## Descoberta automática do motor (zero fricção)
 
@@ -87,8 +87,7 @@ estudio-reis-atualizacao/
 │   └── manifest.webmanifest
 ├── version.json        # build soberana (BUILD_NUMBER)
 ├── CHANGELOG.md
-├── netlify.toml        # publish, redirects e headers
-├── _redirects
+├── .nojekyll
 └── README.md
 ```
 

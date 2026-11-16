@@ -2,6 +2,16 @@
 
 Formato: Keep a Changelog · Versões seguem `version.json` (a build de número MAIOR é a soberana).
 
+## [2.7.0] — build 270 — 2026-11-16
+
+### Migração de infraestrutura (puração do Netlify)
+- **Removido** `netlify.toml`, `_redirects` e `netlify/functions/` do repositório.
+- **IA local**: novo serviço `ai-chat.js` (Node, sem dependências) em `127.0.0.1:8099`, com a mesma
+  cascata Groq → OpenRouter → HuggingFace → OpenAI → Gemini. O front-end chama `/api/chat`.
+- **AWS EC2 + Nginx**: app publicado em `/var/www/studio-reis/estudio-reis-atualizacao`, vhost
+  `studioreis.reisconsultoriacontabil.com.br` com SSL Let's Encrypt; `/api/chat` faz proxy para o serviço.
+- `version.json` → `v2.7.0` (build 270). Assets `?v=270`.
+
 ## [2.6.0] — build 260 — 2026-11-16
 
 ### Adicionado
