@@ -2,6 +2,46 @@
 
 Formato: Keep a Changelog · Versões seguem `version.json` (a build de número MAIOR é a soberana).
 
+## [2.2.0] — build 220 — 2026-11-16
+
+### Adicionado
+- **Interface dual-mode** com transição fluida: **Chat/Assistente** (estilo Qwen) ↔ **Canvas de
+  produção** (nós). Alternador no cabeçalho.
+- **Assistente local** no chat: estrutura a ideia em roteiro, explica o Wan2.1, dá dicas de prompt
+  e envia a cena para o Canvas com um clique (“Levar ao Canvas”).
+- **Canvas enriquecido**: nó Roteiro com subpainéis **Protagonista** (nome, traços, vestimenta,
+  consistência), **Antagonista** e **Cena** (descrição, prompt positivo, negativo, estilo,
+  modificadores e LoRA); nó Parâmetros com frames calculados (16 fps × s + 1) e resolução.
+- **Biblioteca** com reenvio que restaura todos os campos do roteiro.
+
+### Mantido
+- Login unificado, sessão persistente, descoberta automática por `motor.json`, status
+  verde/âmbar, polling e S3 24h. Nenhum modal de URL/token.
+
+### Alterado
+- `version.json` → `v2.2.0` (build 220).
+
+## [2.1.0] — build 210 — 2026-11-16
+
+### Adicionado
+- **Workspace em nós (Canvas)** estilo ComfyUI: Roteiro → Parâmetros → Motor Wan2.1 → Preview,
+  com conexões SVG animadas e grade de fundo.
+- **Nó Roteiro**: protagonista, antagonista, descrição da cena, estilo visual e modificadores/LoRA.
+- **Nó Parâmetros**: modo T2V/I2V, proporção (16:9 / 9:16 / 1:1), duração 1–5 s, steps
+  (4–20), seed, resolução/quadros calculados e upload de referência (I2V).
+- **Nó Motor**: status dinâmico (verde = pronto; âmbar pulsante = aguardando) alimentado por
+  `motor.json`; botão **Criar Vídeo** gerencia fila/polling.
+- **Nó Preview**: player, progresso, cancelamento, download e metadados.
+- **Seed** propagado ao motor (`qualidade.seed`) no `estudio-reis-motor-wan`.
+
+### Corrigido
+- Nenhum modal de URL/token — descoberta 100% automática; fallback “Aguardando inicialização do
+  motor…” sem bloquear o fluxo.
+- Assets versionados `?v=210`.
+
+### Alterado
+- `version.json` → `v2.1.0` (build 210).
+
 ## [2.0.2] — build 202 — 2026-11-16
 
 ### Corrigido

@@ -31,6 +31,8 @@ const ESTADOS = {
   cancelado: { label: 'Cancelado', badge: 'Cancelado', cls: '' },
 };
 
+const DIMS = { '16:9': [1280, 720], '9:16': [720, 1280], '1:1': [960, 960] };
+
 let jobs = loadJobs();
 let activeId = null;
 let pollTimer = null;
@@ -38,6 +40,9 @@ let ref = null;
 let motor = null;
 let motorTimer = null;
 let pendente = null;
+let modo = 't2v';
+let aspect = '16:9';
+let modoAtual = 'chat';
 
 function loadJobs() {
   try {
@@ -52,7 +57,7 @@ function persistJobs() {
   try {
     localStorage.setItem(KEY_JOBS, JSON.stringify(jobs.slice(0, 40)));
   } catch {
-    /* cota cheia: segue sem persistir */
+    /* cota cheia */
   }
 }
 
@@ -93,7 +98,7 @@ async function api(path, options = {}) {
     return { ok: res.ok, status: res.status, data };
   } catch (err) {
     const aborted = err && err.name === 'AbortError';
-    throw new Error(aborted ? 'O motor demorou demais para responder.' : 'Sem conexão com o motor.');
+    throw new Error(aborted ? 'O motor demorou demais.' : 'Sem conexão com o motor.');
   } finally {
     clearTimeout(timer);
   }
@@ -101,21 +106,28 @@ async function api(path, options = {}) {
 
 function friendlyError(status, data) {
   const detail = (data && (data.detail || data.erro || data.error)) || '';
-  if (status === 401) return 'O motor recusou a sessão. Tente novamente.';
-  if (status === 404) return 'O pedido não foi encontrado no motor.';
-  if (status === 400) return detail || 'O pedido foi recusado pelo motor.';
-  if (status >= 500) return detail || 'O motor teve uma falha interna.';
+  if (status === 401) return 'O motor recusou a sessão.';
+  if (status === 404) return 'Pedido não encontrado no motor.';
+  if (status === 400) return detail || 'Pedido recusado pelo motor.';
+  if (status >= 500) return detail || 'Falha interna do motor.';
   return detail || `Falha inesperada (HTTP ${status}).`;
 }
 
-/* ── descoberta automática do motor ─────────────────────── */
+/* ── descoberta automática ──────────────────────────────── */
 
 function statusMotor(ok) {
-  const note = $('motor-note');
-  if (!note) return;
-  note.hidden = Boolean(ok);
-  if (!ok) {
-    $('motor-note-text').textContent = 'Aguardando inicialização do motor…';
+  const pill = $('motor-pill');
+  if (pill) {
+    pill.className = 'status-pill ' + (ok ? 'ok' : 'wait');
+    $('motor-pill-text').textContent = ok ? 'Motor pronto para renderizar' : 'Aguardando inicialização do motor…';
+  }
+  const st = $('motor-state');
+  if (st) {
+    st.className = 'motor-state ' + (ok ? 'ok' : 'wait');
+    $('motor-state-text').textContent = ok ? 'Pronto para renderizar' : 'Aguardando…';
+    $('motor-sub').textContent = ok
+      ? `${motor && motor.modelo ? motor.modelo : 'wan2.1'} · GPU · S3 24h`
+      : 'descoberto via motor.json · S3 24h';
   }
 }
 
@@ -137,17 +149,16 @@ async function cicloMotor() {
   const mudou = Boolean(novo) && (!motor || novo.url !== motor.url);
   motor = novo;
   statusMotor(Boolean(novo));
-
   if (mudou) {
     if (pendente) {
       const p = pendente;
       pendente = null;
       enviarPedido(p);
     } else if (!activeId) {
-      const retomavel = jobs.find((j) => j.estado === 'na-fila' || j.estado === 'renderizando');
-      if (retomavel) {
-        activeId = retomavel.id;
-        startPolling(retomavel.id);
+      const ret = jobs.find((j) => j.estado === 'na-fila' || j.estado === 'renderizando');
+      if (ret) {
+        activeId = ret.id;
+        startPolling(ret.id);
       }
     }
   }
@@ -157,6 +168,198 @@ function iniciarDescoberta() {
   cicloMotor();
   if (motorTimer) clearInterval(motorTimer);
   motorTimer = setInterval(cicloMotor, DESCOBERTA_MS);
+}
+
+/* ── modos (chat / canvas) ──────────────────────────────── */
+
+function setMode(mode) {
+  const chat = $('view-chat');
+  const canvas = $('view-canvas');
+  const alvo = mode === 'canvas' ? canvas : chat;
+  const outro = mode === 'canvas' ? chat : canvas;
+  modoAtual = mode;
+
+  document.querySelectorAll('#mode-toggle button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+
+  const aplicar = () => {
+    outro.hidden = true;
+    outro.classList.remove('leaving');
+    alvo.hidden = false;
+    alvo.classList.add('entering');
+    requestAnimationFrame(() => requestAnimationFrame(() => alvo.classList.remove('entering')));
+    if (mode === 'canvas') {
+      requestAnimationFrame(desenharConexoes);
+      setTimeout(desenharConexoes, 320);
+    }
+  };
+
+  if (outro.hidden) {
+    aplicar();
+    return;
+  }
+  outro.classList.add('leaving');
+  setTimeout(aplicar, 180);
+}
+
+/* ── conexões do canvas ─────────────────────────────────── */
+
+function desenharConexoes() {
+  const svg = $('wires');
+  const canvas = $('canvas');
+  if (!svg || !canvas) return;
+  if (window.matchMedia('(max-width: 1180px)').matches) {
+    svg.innerHTML = '';
+    return;
+  }
+  const cr = canvas.getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${cr.width} ${cr.height}`);
+  svg.innerHTML = '';
+
+  const pares = [
+    ['port-script', 'port-params-in'],
+    ['port-params-out', 'port-motor-in'],
+    ['port-motor-out', 'port-out-in'],
+  ];
+  for (const [a, b] of pares) {
+    const pa = $(a);
+    const pb = $(b);
+    if (!pa || !pb) continue;
+    const ra = pa.getBoundingClientRect();
+    const rb = pb.getBoundingClientRect();
+    const x1 = ra.left + ra.width / 2 - cr.left;
+    const y1 = ra.top + ra.height / 2 - cr.top;
+    const x2 = rb.left + rb.width / 2 - cr.left;
+    const y2 = rb.top + rb.height / 2 - cr.top;
+    const dx = Math.max(36, Math.abs(x2 - x1) * 0.5);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
+    path.setAttribute('class', 'wire');
+    svg.appendChild(path);
+  }
+}
+
+/* ── assistente (chat) ──────────────────────────────────── */
+
+function detectarEstilo(t) {
+  if (/anime|mang[aá]|anima[cç][aã]o japonesa/.test(t)) return 'anime';
+  if (/cyberpunk|neon|tecnol[oó]gico|futurista/.test(t)) return 'cyberpunk';
+  if (/3d|pixar|desenho animado|cartoon|infantil/.test(t)) return 'animacao_3d';
+  if (/cinema|filme|dram[aá]tico|cinematogr[aá]fico/.test(t)) return 'cinematografico';
+  return 'realista';
+}
+
+function responder(texto) {
+  const t = texto.toLowerCase();
+
+  if (/(wan|motor|como funciona|gpu|kaggle|s3)/.test(t)) {
+    return {
+      texto:
+        'O **Wan2.1** roda na GPU (Kaggle/ComfyUI) e fica desacoplado do site. O Estúdio descobre o motor sozinho por um registro público (motor.json) — você nunca digita URL nem token.\n\n' +
+        'O fluxo é: Roteiro → Parâmetros → Motor → Preview. Ao concluir, o vídeo vai para a AWS S3 e expira em 24 h.',
+    };
+  }
+  if (/(melhor|dica|prompt|qualidade)/.test(t)) {
+    return {
+      texto:
+        'Para um bom prompt:\n\n' +
+        '• Descreva **sujeito + ação + cenário + câmera** (ex.: “menino 3D corre na chuva, câmera lenta, luz neon”).\n' +
+        '• Diga o **estilo** (realista, cinema, anime, 3D) e a **proporção**.\n' +
+        '• Use **steps 8–12** para equilíbrio; 4 é rascunho rápido.\n' +
+        '• Fixe a **seed** quando quiser repetir o resultado.',
+    };
+  }
+  if (/(vertical|9:16|reels|tiktok|stories)/.test(t)) {
+    return {
+      texto:
+        'Para vertical **9:16** (720×1280), escolha a proporção 9:16 no nó Parâmetros. Duração de 3–5 s e steps 8 costumam render bem. Levo você ao Canvas para ajustar?',
+      acao: { tipo: 'canvas', cena: texto, estilo: 'realista' },
+    };
+  }
+  if (/(roteiro|cena|criar|ideia|v[ií]deo|hist[oó]ria|personagem)/.test(t) || texto.length > 34) {
+    const estilo = detectarEstilo(t);
+    const rotulo = (STYLES[estilo] || STYLES.realista).label;
+    return {
+      texto:
+        'Boa! Estruturei sua ideia:\n\n' +
+        `• **Cena**: ${texto}\n` +
+        `• **Estilo sugerido**: ${rotulo}\n` +
+        '• **Faltam**: protagonista/antagonista e o enquadramento (se quiser detalhar).\n\n' +
+        'Posso levar isso para o Canvas — lá você ajusta personagens, prompt e parâmetros e clica em **Criar Vídeo**.',
+      acao: { tipo: 'canvas', cena: texto, estilo },
+    };
+  }
+  if (/(ol[aá]|oi\b|bom dia|boa tarde|boa noite)/.test(t)) {
+    return { texto: 'Olá! Sou o assistente do Estúdio Reis. Posso estruturar um roteiro, explicar o Wan2.1 ou melhorar seu prompt. O que vamos criar?' };
+  }
+  return {
+    texto:
+      'Posso ajudar a transformar sua ideia em um roteiro de vídeo. Descreva a cena com uma frase (ex.: “um astronauta caminha em Marte ao pôr do sol”) e eu estruturo para o Canvas.',
+  };
+}
+
+function addMsg(autor, texto, acao) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + autor;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  if (autor === 'assistant') {
+    const img = document.createElement('img');
+    img.src = '/brand/isotipo/studio-reis-isotipo.svg';
+    img.alt = '';
+    avatar.append(img);
+  } else {
+    avatar.textContent = 'R';
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = texto;
+
+  if (acao && acao.tipo === 'canvas') {
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    const b = document.createElement('button');
+    b.className = 'btn primary';
+    b.type = 'button';
+    b.textContent = 'Levar ao Canvas';
+    b.onclick = () => levarAoCanvas(acao.cena, acao.estilo);
+    actions.append(b);
+    bubble.append(actions);
+  }
+
+  wrap.append(avatar, bubble);
+  $('messages').append(wrap);
+  $('chat-hero').hidden = true;
+  const sc = $('chat-scroll');
+  sc.scrollTop = sc.scrollHeight;
+}
+
+function levarAoCanvas(cena, estilo) {
+  if (cena) $('cena').value = cena;
+  if (estilo) $('estilo').value = estilo;
+  if (!$('negativo').value.trim()) $('negativo').value = NEGATIVE;
+  setMode('canvas');
+  setTimeout(() => $('cena').focus(), 420);
+  toast('Roteiro levado ao Canvas.');
+}
+
+function enviarChat(texto) {
+  const t = texto.trim();
+  if (!t) return;
+  addMsg('user', t);
+  $('chat-text').value = '';
+  autoGrowChat();
+  setTimeout(() => {
+    const r = responder(t);
+    addMsg('assistant', r.texto, r.acao);
+  }, 320);
+}
+
+function autoGrowChat() {
+  const t = $('chat-text');
+  t.style.height = 'auto';
+  t.style.height = Math.min(t.scrollHeight, 160) + 'px';
 }
 
 /* ── imagem de referência ───────────────────────────────── */
@@ -169,7 +372,6 @@ function fileToDataUrl(file) {
     reader.readAsDataURL(file);
   });
 }
-
 function loadImage(src) {
   return new Promise((ok, fail) => {
     const img = new Image();
@@ -178,99 +380,117 @@ function loadImage(src) {
     img.src = src;
   });
 }
-
 function dataUrlBytes(dataUrl) {
   const i = dataUrl.indexOf(',');
   const b64 = i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
   return Math.ceil((b64.length * 3) / 4);
 }
-
 async function prepareImage(file) {
-  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
-    throw new Error('Use uma imagem JPG, PNG ou WebP.');
-  }
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error('Use JPG, PNG ou WebP.');
   let dataUrl = await fileToDataUrl(file);
   if (dataUrlBytes(dataUrl) <= MAX_REF_BYTES) return { dataUrl, name: file.name };
-
   const img = await loadImage(dataUrl);
-  const steps = [
-    [1280, 0.85],
-    [1024, 0.8],
-    [854, 0.78],
-    [640, 0.75],
-  ];
-  for (const [max, q] of steps) {
+  for (const [max, q] of [[1280, 0.85], [1024, 0.8], [854, 0.78], [640, 0.75]]) {
     const scale = Math.min(1, max / Math.max(img.width, img.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.width * scale);
-    canvas.height = Math.round(img.height * scale);
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    const out = canvas.toDataURL('image/jpeg', q);
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * scale);
+    c.height = Math.round(img.height * scale);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const out = c.toDataURL('image/jpeg', q);
     if (dataUrlBytes(out) <= MAX_REF_BYTES) return { dataUrl: out, name: file.name };
   }
-  throw new Error('Essa imagem é pesada demais para uma referência.');
+  throw new Error('Imagem pesada demais para referência.');
 }
-
 function setRef(data) {
   ref = data;
+  const prev = $('ref-prev');
+  if (!prev) return;
   if (!data) {
-    $('ref').hidden = true;
+    prev.hidden = true;
     $('ref-img').removeAttribute('src');
-    $('ref-name').textContent = '';
     return;
   }
   $('ref-img').src = data.dataUrl;
-  $('ref-name').textContent = data.name;
-  $('ref').hidden = false;
+  prev.hidden = false;
+  $('ref-status').textContent = 'Referência anexada (I2V).';
 }
 
-/* ── views ──────────────────────────────────────────────── */
+/* ── leitura dos nós ────────────────────────────────────── */
 
-function show(view) {
-  const map = { welcome: $('view-welcome'), job: $('view-job'), library: $('view-library') };
-  Object.entries(map).forEach(([k, el]) => {
-    el.hidden = k !== view;
-  });
+function coletarPedido() {
+  const cena = $('cena').value.trim();
+  if (cena.length < 4) {
+    toast('Descreva a cena no nó Roteiro.');
+    setMode('canvas');
+    setTimeout(() => $('cena').focus(), 350);
+    return null;
+  }
+  return {
+    prot: {
+      nome: $('prot-nome').value.trim(),
+      tracos: $('prot-tracos').value.trim(),
+      roupa: $('prot-roupa').value.trim(),
+      consistencia: $('prot-consistencia').value,
+    },
+    ant: {
+      nome: $('ant-nome').value.trim(),
+      tracos: $('ant-tracos').value.trim(),
+      roupa: $('ant-roupa').value.trim(),
+    },
+    cena,
+    estilo: $('estilo').value,
+    positivo: $('positivo').value.trim(),
+    negativo: $('negativo').value.trim(),
+    lora: $('lora').value.trim(),
+    loraNome: $('lora-nome').value.trim(),
+    modo,
+    aspect,
+    duration: Number($('duration').value) || 5,
+    steps: Number($('steps').value) || 8,
+    seed: $('seed').value.trim() ? Number($('seed').value) : 0,
+  };
 }
-
-function autoGrow() {
-  const t = $('prompt');
-  t.style.height = 'auto';
-  t.style.height = Math.min(t.scrollHeight, 280) + 'px';
-}
-
-/* ── criação ────────────────────────────────────────────── */
 
 function buildPayload(p) {
-  const style = STYLES[p.estilo] || STYLES.realista;
-  const montado = `${p.text}, ${style.suffix}`;
+  const estilo = STYLES[p.estilo] || STYLES.realista;
+  const partes = [];
+
+  const prot = [p.prot.nome, p.prot.tracos, p.prot.roupa].filter(Boolean).join(', ');
+  if (prot) partes.push(`Protagonista: ${prot}${p.prot.consistencia === 'consistente' ? ', aparência consistente' : ''}`);
+  const ant = [p.ant.nome, p.ant.tracos, p.ant.roupa].filter(Boolean).join(', ');
+  if (ant) partes.push(`Antagonista: ${ant}`);
+
+  partes.push(p.cena);
+  if (p.positivo) partes.push(p.positivo);
+  const mods = [p.lora, p.loraNome ? `LoRA ${p.loraNome}` : ''].filter(Boolean).join(', ');
+  if (mods) partes.push(mods);
+  partes.push(estilo.suffix);
+
   const payload = {
-    prompt: { montado: montado.slice(0, MAX_PROMPT), negativo: NEGATIVE },
-    cena: { proporcao: p.proporcao, duracaoSegundos: p.duracao },
-    qualidade: { steps: 30, pesoAtencao: 5.0 },
+    prompt: {
+      montado: partes.join('. ').slice(0, MAX_PROMPT),
+      negativo: (p.negativo || NEGATIVE).slice(0, 600),
+    },
+    cena: { proporcao: p.aspect, duracaoSegundos: p.duration },
+    qualidade: { steps: p.steps, pesoAtencao: 5.0, seed: p.seed || 0 },
     referencias: { itens: [] },
   };
-  if (ref) {
+  if (p.modo === 'i2v' && ref) {
     payload.referenciaBase64 = ref.dataUrl;
     payload.referencias.itens.push({ papel: 'protagonista', ativa: true, url: '' });
   }
   return payload;
 }
 
-function coletarPedido() {
-  const text = $('prompt').value.trim();
-  if (text.length < 4) {
-    toast('Conte um pouco mais da cena.');
-    $('prompt').focus();
-    return null;
-  }
-  return {
-    text,
-    estilo: $('style').value,
-    proporcao: $('aspect').value,
-    duracao: Number($('duration').value) || 5,
-  };
+function atualizarReadout() {
+  const d = Number($('duration').value) || 5;
+  const [w, h] = DIMS[aspect] || DIMS['16:9'];
+  const frames = Math.round((d * 16) / 4) * 4 + 1;
+  $('frames-readout').textContent = String(frames);
+  $('res-hint').textContent = `${aspect} · ${w}×${h}`;
 }
+
+/* ── criação ────────────────────────────────────────────── */
 
 function create() {
   const p = coletarPedido();
@@ -289,7 +509,17 @@ async function enviarPedido(p) {
   const original = botao.innerHTML;
   botao.disabled = true;
   botao.textContent = 'Enviando…';
-  showJobPlaceholder(p.text);
+  $('result-video').hidden = true;
+  $('result-video').removeAttribute('src');
+  $('preview-empty').hidden = false;
+  $('out-actions').hidden = true;
+  $('out-erro').hidden = true;
+  $('job-progress').hidden = false;
+  $('progress-bar').classList.add('indeterminate');
+  $('progress-stage').textContent = 'Enviando o pedido…';
+  $('progress-pct').textContent = '';
+  $('progress-fill').style.width = '0%';
+  $('progress-meta').textContent = '';
 
   try {
     const { ok, status, data } = await api('/api/render', {
@@ -299,10 +529,19 @@ async function enviarPedido(p) {
     if (!ok || !data || !data.id) throw new Error(friendlyError(status, data));
     const entry = {
       id: data.id,
-      titulo: p.text,
+      titulo: p.cena,
+      prot: p.prot,
+      ant: p.ant,
       estilo: p.estilo,
-      proporcao: p.proporcao,
-      duracao: p.duracao,
+      positivo: p.positivo,
+      negativo: p.negativo,
+      lora: p.lora,
+      loraNome: p.loraNome,
+      modo: p.modo,
+      proporcao: p.aspect,
+      duracao: p.duration,
+      steps: p.steps,
+      seed: p.seed,
       criadoEm: new Date().toISOString(),
       estado: data.estado || 'na-fila',
       progresso: 0,
@@ -314,12 +553,14 @@ async function enviarPedido(p) {
     jobs.unshift(entry);
     persistJobs();
     activeId = data.id;
-    updateJobView(entry);
+    updateOut(entry);
     startPolling(data.id);
   } catch (err) {
     pendente = p;
     statusMotor(false);
-    show('welcome');
+    $('job-progress').hidden = true;
+    $('out-erro').hidden = false;
+    $('out-erro').textContent = 'Aguardando inicialização do motor…';
     toast('Aguardando inicialização do motor…');
   } finally {
     botao.disabled = false;
@@ -327,52 +568,32 @@ async function enviarPedido(p) {
   }
 }
 
-/* ── job / progresso ────────────────────────────────────── */
-
-function showJobPlaceholder(text) {
-  show('job');
-  $('job-badge').textContent = 'Enviando';
-  $('job-badge').className = 'badge ativo';
-  $('job-title-text').textContent = 'Seu vídeo';
-  $('job-prompt').textContent = text;
-  $('job-progress').hidden = false;
-  $('job-result').hidden = true;
-  $('job-erro').hidden = true;
-  $('job-cancel').hidden = true;
-  $('progress-stage').textContent = 'Enviando o pedido…';
-  $('progress-pct').textContent = '';
-  $('progress-fill').style.width = '0%';
-  $('progress-bar').classList.add('indeterminate');
-  $('progress-meta').textContent = '';
-}
+/* ── polling / saída ────────────────────────────────────── */
 
 function findJob(id) {
   return jobs.find((j) => j.id === id) || null;
 }
 
-function updateJobView(j) {
-  show('job');
-  $('job-badge').textContent = (ESTADOS[j.estado] || {}).badge || j.estado;
-  $('job-badge').className = 'badge ' + ((ESTADOS[j.estado] || {}).cls || '');
-  $('job-title-text').textContent = 'Seu vídeo';
-  $('job-prompt').textContent = j.titulo || '';
-
+function updateOut(j) {
   if (j.estado === 'concluido' && j.urlAbs) {
     $('job-progress').hidden = true;
-    $('job-erro').hidden = true;
-    $('job-result').hidden = false;
-    const v = $('result-video');
-    if (v.getAttribute('src') !== j.urlAbs) v.src = j.urlAbs;
+    $('out-erro').hidden = true;
+    $('preview-empty').hidden = true;
+    $('result-video').hidden = false;
+    $('result-video').src = j.urlAbs;
+    $('out-actions').hidden = false;
     $('result-download').href = j.urlAbs;
     $('result-download').setAttribute('download', j.nome || 'estudio-reis.mp4');
-    $('result-meta').textContent = [j.proporcao, j.duracao + 's', dataBr(j.criadoEm)].join(' · ');
+    $('result-meta').textContent = [j.proporcao, j.duracao + 's', `steps ${j.steps || ''}`, dataBr(j.criadoEm)].join(' · ');
     return;
   }
 
-  $('job-result').hidden = true;
+  $('result-video').hidden = true;
+  $('preview-empty').hidden = false;
+  $('out-actions').hidden = true;
+  $('out-erro').hidden = true;
   $('job-progress').hidden = false;
   $('progress-bar').classList.remove('indeterminate');
-  $('job-cancel').hidden = false;
 
   const final = j.estado === 'erro' || j.estado === 'cancelado';
   if (final) {
@@ -380,22 +601,18 @@ function updateJobView(j) {
     $('progress-pct').textContent = '';
     $('progress-fill').style.width = j.estado === 'cancelado' ? '0%' : '100%';
     $('progress-meta').textContent = '';
-    $('job-cancel').hidden = true;
     if (j.estado === 'erro') {
-      $('job-erro').hidden = false;
-      $('job-erro-text').textContent = j.erro || 'O motor não conseguiu concluir. Tente novamente.';
-    } else {
-      $('job-erro').hidden = true;
+      $('out-erro').hidden = false;
+      $('out-erro').textContent = j.erro || 'O motor não concluiu. Tente novamente.';
     }
     return;
   }
 
-  $('job-erro').hidden = true;
   const pct = Math.max(0, Math.min(100, Number(j.progresso) || 0));
   $('progress-stage').textContent = j.etapa || (j.estado === 'na-fila' ? 'Na fila…' : 'Gerando…');
   $('progress-pct').textContent = j.estado === 'na-fila' ? 'na fila' : pct + '%';
   $('progress-fill').style.width = (j.estado === 'na-fila' ? 6 : pct) + '%';
-  $('progress-meta').textContent = `Modelo Wan · ${j.proporcao} · ${j.duracao}s`;
+  $('progress-meta').textContent = `${j.proporcao} · ${j.duracao}s · steps ${j.steps || ''}`;
 }
 
 function startPolling(id) {
@@ -403,14 +620,12 @@ function startPolling(id) {
   pollTimer = setInterval(() => poll(id), POLL_MS);
   poll(id);
 }
-
 function stopPolling() {
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
   }
 }
-
 async function poll(id) {
   if (activeId && activeId !== id) return;
   const j = findJob(id);
@@ -423,7 +638,7 @@ async function poll(id) {
         j.erro = 'O pedido não existe mais no motor (sessão reiniciada?).';
         persistJobs();
         stopPolling();
-        updateJobView(j);
+        updateOut(j);
       }
       return;
     }
@@ -433,21 +648,17 @@ async function poll(id) {
     if (data.saida) {
       j.urlAbs = apiBase() + data.saida.url;
       j.nome = data.saida.nome || '';
-      j.largura = data.saida.largura;
-      j.altura = data.saida.altura;
-      j.duracaoReal = data.saida.duracaoSegundos;
     }
     if (data.erro) j.erro = data.erro;
     persistJobs();
-
     if (j.estado === 'concluido' || j.estado === 'erro' || j.estado === 'cancelado') {
       stopPolling();
       activeId = null;
     }
-    updateJobView(j);
+    updateOut(j);
   } catch {
     j.etapa = 'Reconectando ao motor…';
-    updateJobView(j);
+    updateOut(j);
   }
 }
 
@@ -455,7 +666,6 @@ async function cancelJob() {
   if (!activeId) return;
   const id = activeId;
   stopPolling();
-  $('job-cancel').disabled = true;
   try {
     await api(`/api/render/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
     toast('Pedido cancelado.');
@@ -467,22 +677,16 @@ async function cancelJob() {
     j.estado = 'cancelado';
     j.etapa = 'Cancelado';
     persistJobs();
-    updateJobView(j);
+    updateOut(j);
   }
   activeId = null;
-  $('job-cancel').disabled = false;
 }
 
 /* ── biblioteca ─────────────────────────────────────────── */
 
 function dataBr(iso) {
   try {
-    return new Date(iso).toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   } catch {
     return '';
   }
@@ -491,17 +695,14 @@ function dataBr(iso) {
 function renderLibrary() {
   const grade = $('lib-grade');
   grade.replaceChildren();
-  $('lib-count').textContent = jobs.length
-    ? `${jobs.length} ${jobs.length === 1 ? 'criação' : 'criações'}`
-    : '';
+  $('lib-count').textContent = jobs.length ? `${jobs.length} ${jobs.length === 1 ? 'criação' : 'criações'}` : '';
 
   if (!jobs.length) {
     const v = document.createElement('div');
     v.className = 'vazio';
     v.innerHTML =
-      '<div class="big" aria-hidden="true">🎬</div>' +
-      '<h3>Nada por aqui ainda</h3>' +
-      '<p>Descreva uma cena e toque em “Criar Vídeo”. Suas criações ficam guardadas neste navegador.</p>';
+      '<div class="big" aria-hidden="true">🎬</div><h3>Nada por aqui ainda</h3>' +
+      '<p>Monte o roteiro, ajuste os parâmetros e toque em “Criar Vídeo”.</p>';
     grade.append(v);
     return;
   }
@@ -509,7 +710,6 @@ function renderLibrary() {
   jobs.forEach((j) => {
     const card = document.createElement('article');
     card.className = 'card';
-
     const thumb = document.createElement('div');
     thumb.className = 'thumb';
     thumb.innerHTML =
@@ -522,13 +722,11 @@ function renderLibrary() {
 
     const body = document.createElement('div');
     body.className = 'body';
-
     const h3 = document.createElement('h3');
     h3.textContent = j.titulo || 'Sem título';
     const meta = document.createElement('p');
     meta.className = 'meta';
     meta.textContent = [dataBr(j.criadoEm), j.proporcao, j.duracao + 's'].join(' · ');
-
     const acoes = document.createElement('div');
     acoes.className = 'acoes';
 
@@ -550,13 +748,30 @@ function renderLibrary() {
       again.type = 'button';
       again.textContent = '↻ Reenviar';
       again.onclick = () => {
-        $('prompt').value = j.titulo || '';
-        $('style').value = j.estilo || 'realista';
-        $('aspect').value = j.proporcao || '16:9';
+        $('cena').value = j.titulo || '';
+        if (j.prot) {
+          $('prot-nome').value = j.prot.nome || '';
+          $('prot-tracos').value = j.prot.tracos || '';
+          $('prot-roupa').value = j.prot.roupa || '';
+          $('prot-consistencia').value = j.prot.consistencia || 'consistente';
+        }
+        if (j.ant) {
+          $('ant-nome').value = j.ant.nome || '';
+          $('ant-tracos').value = j.ant.tracos || '';
+          $('ant-roupa').value = j.ant.roupa || '';
+        }
+        $('estilo').value = j.estilo || 'realista';
+        $('positivo').value = j.positivo || '';
+        $('negativo').value = j.negativo || NEGATIVE;
+        $('lora').value = j.lora || '';
+        $('lora-nome').value = j.loraNome || '';
+        setAspect(j.proporcao || '16:9');
         $('duration').value = String(j.duracao || 5);
-        autoGrow();
-        show('welcome');
-        $('prompt').focus();
+        $('steps').value = String(j.steps || 8);
+        $('seed').value = j.seed ? String(j.seed) : '';
+        atualizarReadout();
+        setMode('canvas');
+        window.scrollTo({ top: 0 });
       };
       acoes.append(again);
     }
@@ -570,13 +785,9 @@ function renderLibrary() {
 function openHistory(j) {
   activeId = null;
   stopPolling();
-  $('prompt').value = j.titulo || '';
-  $('style').value = j.estilo || 'realista';
-  $('aspect').value = j.proporcao || '16:9';
-  $('duration').value = String(j.duracao || 5);
-  autoGrow();
-  updateJobView(j);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  updateOut(j);
+  setMode('canvas');
+  window.scrollTo({ top: 0 });
 }
 
 /* ── login unificado ────────────────────────────────────── */
@@ -595,59 +806,69 @@ function showLogin() {
 function boot() {
   $('login').hidden = true;
   $('app-shell').hidden = false;
-  autoGrow();
-  show('welcome');
+  if (!$('negativo').value.trim()) $('negativo').value = NEGATIVE;
+  setMode('chat');
   statusMotor(false);
   iniciarDescoberta();
+  atualizarReadout();
+  renderLibrary();
+}
+
+function gravarSessao(email) {
+  const dados = JSON.stringify({ email, em: new Date().toISOString() });
+  try { localStorage.setItem(KEY_SESSION, dados); } catch {}
+  try { sessionStorage.setItem(KEY_SESSION, dados); } catch {}
+}
+function lerSessao() {
+  try {
+    return localStorage.getItem(KEY_SESSION) || sessionStorage.getItem(KEY_SESSION);
+  } catch {
+    return null;
+  }
 }
 
 /* ── eventos ────────────────────────────────────────────── */
 
-$('composer').addEventListener('submit', (e) => {
-  e.preventDefault();
-  create();
+$('mode-toggle').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-mode]');
+  if (b) setMode(b.dataset.mode);
 });
 
-$('prompt').addEventListener('input', autoGrow);
-$('prompt').addEventListener('keydown', (e) => {
+$('chat-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  enviarChat($('chat-text').value);
+});
+$('chat-text').addEventListener('input', autoGrowChat);
+$('chat-text').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
-    $('composer').requestSubmit();
+    enviarChat($('chat-text').value);
   }
 });
-
-$('ref-add').addEventListener('click', () => $('ref-input').click());
-$('ref-remove').addEventListener('click', () => {
-  setRef(null);
-  $('ref-input').value = '';
-});
-$('ref-input').addEventListener('change', async (e) => {
-  const file = e.target.files && e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  try {
-    setRef(await prepareImage(file));
-  } catch (err) {
-    toast(err.message || 'Não consegui usar essa imagem.');
-  }
+$('chat-chips').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-prompt]');
+  if (b) enviarChat(b.dataset.prompt.trim());
 });
 
-$('job-close').addEventListener('click', () => {
-  stopPolling();
-  activeId = null;
-  show('welcome');
-  $('prompt').focus();
-});
+$('btn-create').addEventListener('click', create);
 $('job-cancel').addEventListener('click', cancelJob);
 $('result-again').addEventListener('click', () => {
-  show('welcome');
-  $('prompt').focus();
+  $('result-video').pause();
+  $('result-video').hidden = true;
+  $('result-video').removeAttribute('src');
+  $('preview-empty').hidden = false;
+  $('out-actions').hidden = true;
+  $('out-erro').hidden = true;
+  $('job-progress').hidden = true;
+  $('cena').focus();
 });
 
 $('btn-library').addEventListener('click', () => {
-  renderLibrary();
-  show('library');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if ($('view-canvas').hidden) setMode('canvas');
+  setTimeout(() => {
+    renderLibrary();
+    $('library').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 320);
 });
 
 $('btn-logout').addEventListener('click', () => {
@@ -657,23 +878,51 @@ $('btn-logout').addEventListener('click', () => {
   showLogin();
 });
 
-window.addEventListener('beforeunload', () => {
-  persistJobs();
+$('ref-add').addEventListener('click', () => $('ref-input').click());
+$('ref-remove').addEventListener('click', () => {
+  setRef(null);
+  $('ref-input').value = '';
+  $('ref-status').textContent = '';
+});
+$('ref-input').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  $('ref-status').textContent = 'Preparando…';
+  try {
+    setRef(await prepareImage(file));
+  } catch (err) {
+    $('ref-status').textContent = err.message || 'Não consegui usar a imagem.';
+  }
 });
 
-function gravarSessao(email) {
-  const dados = JSON.stringify({ email, em: new Date().toISOString() });
-  try { localStorage.setItem(KEY_SESSION, dados); } catch {}
-  try { sessionStorage.setItem(KEY_SESSION, dados); } catch {}
+$('modo').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-modo]');
+  if (!b) return;
+  modo = b.dataset.modo;
+  [...$('modo').children].forEach((x) => x.classList.toggle('on', x === b));
+  $('ref-drop').hidden = modo !== 'i2v';
+  setTimeout(desenharConexoes, 50);
+});
+
+$('aspect').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-val]');
+  if (b) setAspect(b.dataset.val);
+});
+function setAspect(v) {
+  aspect = v;
+  [...$('aspect').children].forEach((x) => x.classList.toggle('on', x.dataset.val === v));
+  atualizarReadout();
 }
 
-function lerSessao() {
-  try {
-    return localStorage.getItem(KEY_SESSION) || sessionStorage.getItem(KEY_SESSION);
-  } catch {
-    return null;
-  }
-}
+$('duration').addEventListener('change', atualizarReadout);
+$('steps').addEventListener('change', atualizarReadout);
+
+window.addEventListener('resize', () => {
+  clearTimeout(window.__erResize);
+  window.__erResize = setTimeout(desenharConexoes, 120);
+});
+window.addEventListener('beforeunload', persistJobs);
 
 $('login-form').addEventListener('submit', (e) => {
   e.preventDefault();

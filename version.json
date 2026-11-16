@@ -1,11 +1,11 @@
 {
   "produto": "Estúdio Reis Atualizado",
-  "versao": "v2.0.2",
-  "BUILD_NUMBER": 202,
+  "versao": "v2.2.0",
+  "BUILD_NUMBER": 220,
   "data": "2026-11-16",
   "branch": "main",
   "publicadoEm": "2026-11-16",
-  "commitBase": "correcao-login-credencial-unificada",
+  "commitBase": "dual-mode-chat-canvas-build-220",
   "descoberta": {
     "servico": "estudio-reis-descoberta",
     "arquivo": "motor.json",
