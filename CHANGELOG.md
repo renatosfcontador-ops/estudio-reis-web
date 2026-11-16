@@ -2,6 +2,26 @@
 
 Formato: Keep a Changelog · Versões seguem `version.json` (a build de número MAIOR é a soberana).
 
+## [2.3.0] — build 230 — 2026-11-16
+
+### Adicionado
+- **Chat com IA real** via **Netlify Function** `/.netlify/functions/chat` (serverless): a chave
+  fica protegida no servidor (`AI_API_KEY`, ou `GROQ_API_KEY`/`LLAMA_API_KEY`), nunca no front-end.
+  - `AI_BASE_URL` (padrão Groq, compatível OpenAI) e `AI_MODEL` configuráveis.
+  - A função pede ao modelo um JSON `{reply, roteiro}`; o chat mantém contexto da conversa.
+- **Fallback gracioso**: sem chave, timeout ou indisponibilidade → assistente local estruturado
+  (o usuário nunca fica sem resposta).
+- **“Levar ao Canvas” inteligente**: usa o `roteiro` extraído pela IA (cena, protagonista,
+  antagonista, estilo) e preenche os nós automaticamente.
+- Selo **IA** nas respostas geradas por modelo.
+
+### Segurança
+- Nenhuma chave no bundle do front-end (verificado). A credencial vive só no ambiente do Netlify.
+- `netlify.toml` declara `functions.directory`; headers de segurança mantidos.
+
+### Alterado
+- `version.json` → `v2.3.0` (build 230).
+
 ## [2.2.0] — build 220 — 2026-11-16
 
 ### Adicionado

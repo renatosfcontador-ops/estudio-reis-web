@@ -43,6 +43,7 @@ let pendente = null;
 let modo = 't2v';
 let aspect = '16:9';
 let modoAtual = 'chat';
+let chatHistory = [];
 
 function loadJobs() {
   try {
@@ -297,7 +298,24 @@ function responder(texto) {
   };
 }
 
-function addMsg(autor, texto, acao) {
+async function askAI(messages) {
+  try {
+    const res = await fetch('/.netlify/functions/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: messages.slice(-10) }),
+    });
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return null;
+    const data = await res.json();
+    if (data && data.ok && typeof data.reply === 'string' && data.reply.trim()) return data;
+  } catch {
+    /* sem função/chave: usa o assistente local */
+  }
+  return null;
+}
+
+function addMsg(autor, texto, acao, origem) {
   const wrap = document.createElement('div');
   wrap.className = 'msg ' + autor;
 
@@ -314,7 +332,13 @@ function addMsg(autor, texto, acao) {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.textContent = texto;
+  if (origem === 'ia') {
+    const tag = document.createElement('span');
+    tag.className = 'src-tag';
+    tag.textContent = 'IA';
+    bubble.append(tag, document.createElement('br'));
+  }
+  bubble.append(document.createTextNode(texto));
 
   if (acao && acao.tipo === 'canvas') {
     const actions = document.createElement('div');
@@ -323,7 +347,7 @@ function addMsg(autor, texto, acao) {
     b.className = 'btn primary';
     b.type = 'button';
     b.textContent = 'Levar ao Canvas';
-    b.onclick = () => levarAoCanvas(acao.cena, acao.estilo);
+    b.onclick = () => levarAoCanvas(acao);
     actions.append(b);
     bubble.append(actions);
   }
@@ -335,25 +359,57 @@ function addMsg(autor, texto, acao) {
   sc.scrollTop = sc.scrollHeight;
 }
 
-function levarAoCanvas(cena, estilo) {
+function levarAoCanvas(a) {
+  const cena = (a && a.cena) || '';
+  const prot = (a && a.protagonista) || '';
+  const ant = (a && a.antagonista) || '';
+  const estilo = (a && a.estilo) || 'realista';
+
   if (cena) $('cena').value = cena;
-  if (estilo) $('estilo').value = estilo;
+  if (prot) $('prot-nome').value = prot;
+  if (ant) $('ant-nome').value = ant;
+  if (estilo in STYLES) $('estilo').value = estilo;
   if (!$('negativo').value.trim()) $('negativo').value = NEGATIVE;
+
   setMode('canvas');
   setTimeout(() => $('cena').focus(), 420);
   toast('Roteiro levado ao Canvas.');
 }
 
-function enviarChat(texto) {
+async function enviarChat(texto) {
   const t = texto.trim();
   if (!t) return;
   addMsg('user', t);
   $('chat-text').value = '';
   autoGrowChat();
-  setTimeout(() => {
-    const r = responder(t);
-    addMsg('assistant', r.texto, r.acao);
-  }, 320);
+  chatHistory.push({ role: 'user', content: t });
+
+  const ai = await askAI(chatHistory);
+  let reply;
+  let acao = null;
+  let origem = 'local';
+
+  if (ai) {
+    reply = ai.reply;
+    origem = 'ia';
+    const r = ai.roteiro;
+    if (r && (r.cena || r.protagonista || r.antagonista)) {
+      acao = {
+        tipo: 'canvas',
+        cena: r.cena || t,
+        protagonista: r.protagonista || '',
+        antagonista: r.antagonista || '',
+        estilo: r.estilo || 'realista',
+      };
+    }
+  } else {
+    const local = responder(t);
+    reply = local.texto;
+    acao = local.acao;
+  }
+
+  chatHistory.push({ role: 'assistant', content: reply });
+  addMsg('assistant', reply, acao, origem);
 }
 
 function autoGrowChat() {

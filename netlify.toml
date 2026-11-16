@@ -2,6 +2,11 @@
   publish = "."
   command = ""
 
+# Função serverless do chat (chave de IA protegida no servidor).
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # SPA / anti-404: qualquer rota inexistente devolve o app.
 [[redirects]]
   from = "/*"
