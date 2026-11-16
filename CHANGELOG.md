@@ -2,6 +2,26 @@
 
 Formato: Keep a Changelog · Versões seguem `version.json` (a build de número MAIOR é a soberana).
 
+## [2.6.0] — build 260 — 2026-11-16
+
+### Adicionado
+- **Tela inicial pública (Landing & Preços)** antes do app:
+  - Cabeçalho de boas-vindas + status do motor.
+  - Hero “Vídeos com IA, do roteiro à tela” + CTAs.
+  - Vitrine de estilos (Realista, 3D, Anime, Cyberpunk) com “Criar neste estilo”.
+  - **Tabela dolarizada de 8 planos** (USD): Starter $6, Comerciante $16, Estúdio $35, Pro $60,
+    Master Top $100, Business Elite $200, Anual Ilimitado Pro VIP $400, Platina Vitalício $999.
+  - Destaques “Mais completo” (Anual) e “Vitalício” (Platina); botões “Comprar créditos”/
+    “Assinar Plano”; link discreto de **WhatsApp** sem travar o fluxo.
+  - “Como funciona” + CTA final.
+- **Fluxo**: Landing → Login unificado → Chat (“Como posso ajudar?”) → Canvas.
+  O botão do plano/showcase leva ao login e retoma a ação pendente.
+- **Preços** no rodapé e no botão do plano (gateway a configurar).
+
+### Alterado
+- `version.json` → `v2.6.0` (build 260). Assets `?v=260`.
+- Login overlay agora é sob demanda (a landing abre direto).
+
 ## [2.5.0] — build 250 — 2026-11-16
 
 ### Adicionado

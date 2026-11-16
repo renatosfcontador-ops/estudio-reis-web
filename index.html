@@ -11,11 +11,176 @@
   <link rel="icon" href="brand/icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="brand/icons/apple-touch-icon.png">
   <link rel="manifest" href="brand/manifest.webmanifest">
-  <link rel="stylesheet" href="assets/styles.css?v=250">
+  <link rel="stylesheet" href="assets/styles.css?v=260">
 </head>
 <body>
+  <!-- ═══════════ Landing / Preços (pública) ═══════════ -->
+  <div class="landing" id="view-landing">
+    <header class="topbar landing-top">
+      <a class="brand" href="./" aria-label="Estúdio Reis — início">
+        <span class="brand-mark" aria-hidden="true"><img src="brand/isotipo/studio-reis-isotipo.svg" alt=""></span>
+        <span class="brand-name">Estúdio Reis</span>
+      </a>
+      <div class="topbar-actions">
+        <span class="status-pill wait" id="motor-pill-landing" role="status" aria-live="polite">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="motor-pill-text-landing">Aguardando inicialização do motor…</span>
+        </span>
+        <button class="btn primary" id="btn-login-top" type="button">Entrar</button>
+      </div>
+    </header>
+
+    <section class="hero-landing">
+      <h1>Vídeos com IA,<br>do roteiro à tela.</h1>
+      <p>Descreva a cena. O Estúdio Reis gera o vídeo na nuvem (Wan2.1), com personagens consistentes, narração e entrega em alta qualidade.</p>
+      <div class="hero-cta">
+        <button class="btn primary big" id="btn-start" type="button">Começar agora</button>
+        <a class="btn" href="#planos">Ver planos</a>
+      </div>
+      <span class="hero-note">2 primeiros vídeos grátis · sem cartão</span>
+    </section>
+
+    <section class="showcase">
+      <div class="wrap">
+        <h2>Feitos no Estúdio Reis</h2>
+        <p class="sub">Escolha um estilo e comece. Os 2 primeiros vídeos são por nossa conta.</p>
+        <div class="showcase-grid">
+          <article class="sc sc-real"><span class="sc-tag">Realista</span><button type="button" class="sc-btn" data-estilo="realista">Criar neste estilo</button></article>
+          <article class="sc sc-3d"><span class="sc-tag">Animação 3D</span><button type="button" class="sc-btn" data-estilo="animacao_3d">Criar neste estilo</button></article>
+          <article class="sc sc-anime"><span class="sc-tag">Anime</span><button type="button" class="sc-btn" data-estilo="anime">Criar neste estilo</button></article>
+          <article class="sc sc-cyber"><span class="sc-tag">Cyberpunk</span><button type="button" class="sc-btn" data-estilo="cyberpunk">Criar neste estilo</button></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="pricing" id="planos">
+      <div class="wrap">
+        <h2>Planos e créditos</h2>
+        <p class="sub">Preços em dólares (USD). Escolha o pacote ou compre créditos avulsos. Sem fidelidade.</p>
+
+        <div class="plans">
+          <article class="plan">
+            <h3>Starter</h3>
+            <div class="price">$6</div>
+            <ul>
+              <li>3 vídeos</li>
+              <li>12 créditos criativos</li>
+              <li>Com marca d'água</li>
+            </ul>
+            <button class="btn" type="button" data-plano="Starter">Comprar créditos</button>
+          </article>
+
+          <article class="plan">
+            <h3>Comerciante</h3>
+            <div class="price">$16</div>
+            <ul>
+              <li>10 vídeos</li>
+              <li>40 créditos criativos</li>
+              <li>Com marca d'água</li>
+            </ul>
+            <button class="btn" type="button" data-plano="Comerciante">Comprar créditos</button>
+          </article>
+
+          <article class="plan">
+            <h3>Estúdio</h3>
+            <div class="price">$35</div>
+            <ul>
+              <li>25 vídeos</li>
+              <li>100 créditos criativos</li>
+              <li>Com marca d'água</li>
+            </ul>
+            <button class="btn" type="button" data-plano="Estúdio">Comprar créditos</button>
+          </article>
+
+          <article class="plan">
+            <h3>Pro</h3>
+            <div class="price">$60</div>
+            <ul>
+              <li>50 vídeos</li>
+              <li>200 créditos criativos</li>
+              <li>Fila prioritária</li>
+            </ul>
+            <button class="btn" type="button" data-plano="Pro">Assinar Plano</button>
+          </article>
+
+          <article class="plan">
+            <h3>Master Top</h3>
+            <div class="price">$100</div>
+            <ul>
+              <li>100 vídeos</li>
+              <li>400 créditos criativos</li>
+              <li>Sem marca d'água</li>
+              <li>Prioridade máxima na GPU</li>
+            </ul>
+            <button class="btn" type="button" data-plano="Master Top">Assinar Plano</button>
+          </article>
+
+          <article class="plan">
+            <h3>Business Elite</h3>
+            <div class="price">$200</div>
+            <ul>
+              <li>250 vídeos</li>
+              <li>1000 créditos corporativos</li>
+              <li>Prioridade máxima</li>
+              <li>Suporte dedicado</li>
+            </ul>
+            <button class="btn" type="button" data-plano="Business Elite">Assinar Plano</button>
+          </article>
+
+          <article class="plan destaque">
+            <span class="ribbon">Mais completo</span>
+            <h3>Anual Ilimitado Pro VIP</h3>
+            <div class="price">$400<span>/ano</span></div>
+            <ul>
+              <li>Vídeos ilimitados por 365 dias</li>
+              <li>Uso justo: 150/mês</li>
+              <li>Sem marca d'água</li>
+              <li>Prioridade máxima + suporte VIP</li>
+            </ul>
+            <button class="btn primary" type="button" data-plano="Anual Ilimitado Pro VIP">Assinar o anual</button>
+          </article>
+
+          <article class="plan vitalicio">
+            <span class="ribbon">Vitalício</span>
+            <h3>Platina Vitalício</h3>
+            <div class="price">$999<span>vitalício</span></div>
+            <ul>
+              <li>Acesso perpétuo vitalício</li>
+              <li>Sem mensalidades</li>
+              <li>Sem marca d'água</li>
+              <li>Prioridade máxima + suporte prioritário</li>
+            </ul>
+            <button class="btn primary" type="button" data-plano="Platina Vitalício">Garantir vitalício</button>
+          </article>
+        </div>
+
+        <p class="pricing-note">Pagamento em USD (PIX/cartão internacional). Os créditos criativos servem para banners, GIFs, thumbnails e fotos. “Em breve” não faz parte da compra.</p>
+        <a class="whats" id="whats-link" href="https://wa.me/?text=Ol%C3%A1!%20Tenho%20d%C3%BAvida%20sobre%20os%20planos%20do%20Est%C3%BAdio%20Reis." target="_blank" rel="noopener noreferrer">Atendimento WhatsApp · planos personalizados</a>
+      </div>
+    </section>
+
+    <section class="how">
+      <div class="wrap">
+        <h2>Como funciona</h2>
+        <div class="steps">
+          <article><span class="n">1</span><h3>Descreva a cena</h3><p>Escreva a ideia no chat e estruture o roteiro com o assistente.</p></article>
+          <article><span class="n">2</span><h3>Ajuste no Canvas</h3><p>Defina personagens, ângulos, voz e parâmetros do Wan2.1.</p></article>
+          <article><span class="n">3</span><h3>Receba o vídeo</h3><p>Acompanhe o render e baixe o MP4. A mídia expira em 24h.</p></article>
+        </div>
+        <div class="how-cta">
+          <button class="btn primary big" id="btn-start-2" type="button">Começar agora</button>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>© Estúdio Reis</span>
+      <span>Wan2.1<span class="dot-sep">·</span>GPU na nuvem<span class="dot-sep">·</span>retenção de 24h</span>
+    </footer>
+  </div>
+
   <!-- ═══════════ Login unificado (Grupo Reis) ═══════════ -->
-  <div class="login" id="login">
+  <div class="login" id="login" hidden>
     <div class="login-card">
       <div class="login-brand">
         <span class="brand-mark" aria-hidden="true"><img src="brand/isotipo/studio-reis-isotipo.svg" alt=""></span>
@@ -316,6 +481,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="assets/app.js?v=250"></script>
+  <script type="module" src="assets/app.js?v=260"></script>
 </body>
 </html>

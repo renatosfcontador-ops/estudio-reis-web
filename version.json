@@ -1,15 +1,21 @@
 {
   "produto": "Estúdio Reis Atualizado",
-  "versao": "v2.5.0",
-  "BUILD_NUMBER": 250,
+  "versao": "v2.6.0",
+  "BUILD_NUMBER": 260,
   "data": "2026-11-16",
   "branch": "main",
   "publicadoEm": "2026-11-16",
-  "commitBase": "elenco-voz-multi-engine-build-250",
+  "commitBase": "landing-precos-8-planos-build-260",
+  "planos": {
+    "moeda": "USD",
+    "quantidade": 8,
+    "valores": [6, 16, 35, 60, 100, 200, 400, 999],
+    "destaques": ["Anual Ilimitado Pro VIP", "Platina Vitalício"]
+  },
   "recursos": {
+    "landing": "tela pública com apresentação, planos e como funciona",
     "elenco": { "personagens": 5, "angulos": ["frente", "costas", "esq", "dir", "cima", "baixo", "olhos"] },
-    "voz": "Web Speech API (preview local) + roteiro.narracao",
-    "descoberta": "motor.json com engines[] (fallback multi-motor)"
+    "voz": "Web Speech API (preview local) + roteiro.narracao"
   },
   "ia": {
     "funcao": "/.netlify/functions/chat",

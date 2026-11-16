@@ -150,6 +150,11 @@ function statusMotor(ok) {
     pill.className = 'status-pill ' + (ok ? 'ok' : 'hybrid');
     $('motor-pill-text').textContent = ok ? 'Motor pronto para renderizar' : 'Modo híbrido · chat ativo';
   }
+  const pillL = $('motor-pill-landing');
+  if (pillL) {
+    pillL.className = 'status-pill ' + (ok ? 'ok' : 'hybrid');
+    $('motor-pill-text-landing').textContent = ok ? 'Motor pronto para renderizar' : 'Modo híbrido · chat ativo';
+  }
   const st = $('motor-state');
   if (st) {
     st.className = 'motor-state ' + (ok ? 'ok' : 'hybrid');
@@ -1142,7 +1147,6 @@ function openHistory(j) {
 function showLogin() {
   stopPolling();
   activeId = null;
-  $('app-shell').hidden = true;
   $('login').hidden = false;
   $('login-erro').textContent = '';
   $('login-pass').value = '';
@@ -1150,17 +1154,39 @@ function showLogin() {
   setTimeout(() => $('login-pass').focus(), 60);
 }
 
+function showLanding() {
+  stopPolling();
+  activeId = null;
+  $('login').hidden = true;
+  $('app-shell').hidden = true;
+  $('view-landing').hidden = false;
+  statusMotor(Boolean(motor));
+  window.scrollTo(0, 0);
+}
+
 function boot() {
   $('login').hidden = true;
+  $('view-landing').hidden = true;
   $('app-shell').hidden = false;
   if (!$('negativo').value.trim()) $('negativo').value = NEGATIVE;
   montarElenco();
   montarVozes();
   setMode('chat');
-  statusMotor(false);
-  iniciarDescoberta();
+  statusMotor(Boolean(motor));
   atualizarReadout();
   renderLibrary();
+
+  const plano = sessionStorage.getItem('er.plano.pendente');
+  if (plano) {
+    sessionStorage.removeItem('er.plano.pendente');
+    setTimeout(() => toast(`Plano ${plano} selecionado. Finalize no gateway.`), 600);
+  }
+  const estilo = sessionStorage.getItem('er.estilo.pendente');
+  if (estilo) {
+    sessionStorage.removeItem('er.estilo.pendente');
+    $('estilo').value = estilo;
+    setMode('canvas');
+  }
 }
 
 function gravarSessao(email) {
@@ -1224,7 +1250,7 @@ $('btn-logout').addEventListener('click', () => {
   try { localStorage.removeItem(KEY_SESSION); } catch {}
   try { sessionStorage.removeItem(KEY_SESSION); } catch {}
   if (motorTimer) clearInterval(motorTimer);
-  showLogin();
+  showLanding();
 });
 
 $('ref-add').addEventListener('click', () => $('ref-input').click());
@@ -1282,6 +1308,41 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('focus', cicloMotor);
 window.addEventListener('beforeunload', persistJobs);
 
+/* ── landing / preços ───────────────────────────────────── */
+
+$('btn-login-top').addEventListener('click', showLogin);
+$('btn-start').addEventListener('click', () => (lerSessao() ? boot() : showLogin()));
+$('btn-start-2').addEventListener('click', () => (lerSessao() ? boot() : showLogin()));
+
+document.querySelectorAll('[data-estilo]').forEach((b) => {
+  b.addEventListener('click', () => {
+    const estilo = b.dataset.estilo;
+    if (!lerSessao()) {
+      sessionStorage.setItem('er.estilo.pendente', estilo);
+      showLogin();
+      return;
+    }
+    $('estilo').value = estilo;
+    setMode('canvas');
+    setTimeout(() => $('cena').focus(), 400);
+  });
+});
+
+document.querySelectorAll('[data-plano]').forEach((b) => {
+  b.addEventListener('click', () => {
+    const plano = b.dataset.plano;
+    if (!lerSessao()) {
+      sessionStorage.setItem('er.plano.pendente', plano);
+      showLogin();
+      return;
+    }
+    toast(`Plano ${plano} selecionado. Finalize no gateway.`);
+  });
+});
+
+const brandApp = document.querySelector('#app-shell .brand');
+if (brandApp) brandApp.addEventListener('click', (e) => { e.preventDefault(); showLanding(); });
+
 $('login-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const email = $('login-email').value.trim().toLowerCase();
@@ -1300,8 +1361,9 @@ $('login-form').addEventListener('submit', (e) => {
   boot();
 });
 
+iniciarDescoberta();
 if (lerSessao()) {
   boot();
 } else {
-  showLogin();
+  showLanding();
 }
