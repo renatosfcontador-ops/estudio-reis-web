@@ -2,6 +2,20 @@
 
 Formato: Keep a Changelog · Versões seguem `version.json` (a build de número MAIOR é a soberana).
 
+## [2.0.2] — build 202 — 2026-11-16
+
+### Corrigido
+- **Login unificado**: validação direta e sem dependência de `crypto.subtle` (que falhava em
+  alguns navegadores/webviews e prendia o usuário na tela de login). Credenciais aceitas:
+  `renato.sf.contador@gmail.com` / `Admin@123`.
+- E-mail **pré-preenchido** e senha com `trim` (evita falha por espaço acidental).
+- **Persistência de sessão** em `localStorage` **e** `sessionStorage` (fallback), liberando a
+  interface após o login e mantendo a sessão entre reloads.
+- Mensagens de erro mais claras (e-mail não autorizado / senha incorreta).
+
+### Alterado
+- `version.json` → `v2.0.2` (build 202).
+
 ## [2.0.1] — build 201 — 2026-11-16
 
 ### Corrigido

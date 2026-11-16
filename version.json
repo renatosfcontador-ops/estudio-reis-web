@@ -1,11 +1,11 @@
 {
   "produto": "Estúdio Reis Atualizado",
-  "versao": "v2.0.1",
-  "BUILD_NUMBER": 201,
+  "versao": "v2.0.2",
+  "BUILD_NUMBER": 202,
   "data": "2026-11-16",
   "branch": "main",
   "publicadoEm": "2026-11-16",
-  "commitBase": "descoberta-automatica-zero-friccao",
+  "commitBase": "correcao-login-credencial-unificada",
   "descoberta": {
     "servico": "estudio-reis-descoberta",
     "arquivo": "motor.json",

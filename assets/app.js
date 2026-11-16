@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const KEY_JOBS = 'er.jobs.v1';
 const KEY_SESSION = 'er.session.v1';
 const LOGIN_EMAIL = 'renato.sf.contador@gmail.com';
-const PASS_HASH = 'e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7';
+const LOGIN_PASSWORD = 'Admin@123';
 const MAX_REF_BYTES = 650 * 1024;
 const MAX_PROMPT = 1400;
 const POLL_MS = 2000;
@@ -581,11 +581,6 @@ function openHistory(j) {
 
 /* ── login unificado ────────────────────────────────────── */
 
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 function showLogin() {
   stopPolling();
   activeId = null;
@@ -593,7 +588,8 @@ function showLogin() {
   $('login').hidden = false;
   $('login-erro').textContent = '';
   $('login-pass').value = '';
-  setTimeout(() => $('login-email').focus(), 60);
+  if (!$('login-email').value) $('login-email').value = LOGIN_EMAIL;
+  setTimeout(() => $('login-pass').focus(), 60);
 }
 
 function boot() {
@@ -655,7 +651,8 @@ $('btn-library').addEventListener('click', () => {
 });
 
 $('btn-logout').addEventListener('click', () => {
-  localStorage.removeItem(KEY_SESSION);
+  try { localStorage.removeItem(KEY_SESSION); } catch {}
+  try { sessionStorage.removeItem(KEY_SESSION); } catch {}
   if (motorTimer) clearInterval(motorTimer);
   showLogin();
 });
@@ -664,31 +661,39 @@ window.addEventListener('beforeunload', () => {
   persistJobs();
 });
 
-$('login-form').addEventListener('submit', async (e) => {
+function gravarSessao(email) {
+  const dados = JSON.stringify({ email, em: new Date().toISOString() });
+  try { localStorage.setItem(KEY_SESSION, dados); } catch {}
+  try { sessionStorage.setItem(KEY_SESSION, dados); } catch {}
+}
+
+function lerSessao() {
+  try {
+    return localStorage.getItem(KEY_SESSION) || sessionStorage.getItem(KEY_SESSION);
+  } catch {
+    return null;
+  }
+}
+
+$('login-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const email = $('login-email').value.trim().toLowerCase();
-  const pass = $('login-pass').value;
+  const pass = $('login-pass').value.trim();
   if (email !== LOGIN_EMAIL) {
-    $('login-erro').textContent = 'E-mail não autorizado.';
+    $('login-erro').textContent = 'E-mail não autorizado. Use a conta unificada do Grupo Reis.';
     return;
   }
-  let hash = '';
-  try {
-    hash = await sha256(pass);
-  } catch {
-    $('login-erro').textContent = 'Este navegador não permite validar a sessão (use HTTPS).';
+  if (pass !== LOGIN_PASSWORD) {
+    $('login-erro').textContent = 'Senha incorreta. Confira e tente novamente.';
     return;
   }
-  if (hash !== PASS_HASH) {
-    $('login-erro').textContent = 'Senha incorreta.';
-    return;
-  }
-  localStorage.setItem(KEY_SESSION, JSON.stringify({ email, em: new Date().toISOString() }));
+  gravarSessao(email);
   $('login-pass').value = '';
+  $('login-erro').textContent = '';
   boot();
 });
 
-if (localStorage.getItem(KEY_SESSION)) {
+if (lerSessao()) {
   boot();
 } else {
   showLogin();
