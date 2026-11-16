@@ -17,8 +17,8 @@ npx serve .
 # ou: python -m http.server 8080
 ```
 
-Abra a URL e, em **Configurações**, informe o endereço do motor (ex.: o túnel
-`trycloudflare` do Kaggle). O token é opcional e fica só no navegador.
+Abra a URL. O endereço do motor é **descoberto automaticamente** (veja abaixo) —
+não existe tela para digitar URL ou token do motor.
 
 ## Publicar no Netlify
 
@@ -27,8 +27,20 @@ Abra a URL e, em **Configurações**, informe o endereço do motor (ex.: o túne
 - Build: nenhum. Publish directory: `.`.
 - O `netlify.toml` já traz o fallback SPA (`_redirects`) e os headers de segurança.
 
+## Descoberta automática do motor (zero fricção)
+
+O notebook do Kaggle (GPU) publica o endpoint ativo + token num serviço de descoberta
+(o repositório público `estudio-reis-descoberta`, arquivo `motor.json`). O front-end lê esse
+JSON em segundo plano (a cada 8 s) e conecta sozinho:
+
+- Motor no ar e fresco (registro < 12 min): o compositor fica pronto, sem avisos.
+- Motor desligado/iniciando: apenas um indicador discreto **“Aguardando inicialização do
+  motor…”**. Se o usuário tocar em **Criar Vídeo** nesse momento, o pedido fica pendente e é
+  enviado automaticamente assim que o motor aparecer — sem nenhuma ação do usuário.
+
 ## Como o pedido vira vídeo
 
+0. O front-end descobre o motor (JSON público) e usa `url` + `token` sem intervenção.
 1. O navegador monta o `payload` (prompt + estilo, proporção, duração, referência).
 2. `POST /api/render` → `202 { id }`.
 3. `GET /api/render/{id}` a cada 2 s → `progresso` e `etapa`.
@@ -43,10 +55,10 @@ ComfyUI e usa como quadro inicial (I2V). Modelos sem suporte a referência
 
 ## Retenção de 24 h
 
-O motor aplica `MOTOR_RETENCAO_HORAS=24` por padrão: o MP4 gerado é apagado 24 h
-após a conclusão (“quem salvou, salvou; quem não salvou, apaga”). O front-end
-guarda apenas o **histórico de metadados** no `localStorage` do navegador — nunca
-os arquivos de vídeo.
+O motor aplica `MOTOR_RETENCAO_HORAS=24` e, quando `S3_BUCKET` está configurado, envia o MP4
+para a AWS S3 e apaga a cópia local. O bucket tem *lifecycle* de 24 h (“quem salvou, salvou;
+quem não salvou, apaga”). O front-end guarda apenas o **histórico de metadados** no
+`localStorage` — nunca os arquivos de vídeo.
 
 ## Estrutura
 
@@ -55,7 +67,7 @@ estudio-reis-atualizacao/
 ├── index.html          # login, marca, compositor e vistas (boas-vindas, job, biblioteca)
 ├── assets/
 │   ├── styles.css      # tema neutro claro/escuro, sem neon
-│   └── app.js          # login, fila/polling, referência, biblioteca, configurações
+│   └── app.js          # login, descoberta automática, fila/polling, referência, biblioteca
 ├── brand/              # enxoval de marca oficial (importado do studio-reis-canvas)
 │   ├── logo/  isotipo/  icons/  banners/ 3d/
 │   ├── css/studio-reis-theme.css
@@ -73,8 +85,8 @@ estudio-reis-atualizacao/
   (logos, isotipo 3D, banners, ícones e manifesto). O cabeçalho e o login usam o isotipo
   oficial; favicon e manifesto apontam para `brand/`.
 - **Login unificado** (padrão Grupo Reis): `renato.sf.contador@gmail.com` + a senha do
-  ecossistema. A sessão fica no `localStorage` e pode ser encerrada em **Configurações**.
-  O login é um portão do lado do cliente — a autoridade real deve ser exercida pelo motor/engine.
+  ecossistema. A sessão fica no `localStorage` e pode ser encerrada no botão **Sair** do
+  cabeçalho. O login é um portão do lado do cliente — a autoridade real deve ser exercida pelo motor/engine.
 
 ## Build
 
@@ -83,7 +95,7 @@ estudio-reis-atualizacao/
 
 ## Segurança
 
-- Token do motor apenas em `localStorage`; nunca versionado.
+- O token do motor vem da descoberta automática (nunca digitado pelo usuário) e é usado em memória.
 - Nenhuma chave de provedor no cliente — o navegador fala só com o seu motor.
 - Headers `nosniff`, `SAMEORIGIN`, `no-referrer` e `Permissions-Policy` no Netlify.
 

@@ -1,11 +1,17 @@
 {
   "produto": "Estúdio Reis Atualizado",
-  "versao": "v2.0.0",
-  "BUILD_NUMBER": 200,
+  "versao": "v2.0.1",
+  "BUILD_NUMBER": 201,
   "data": "2026-11-16",
   "branch": "main",
   "publicadoEm": "2026-11-16",
-  "commitBase": "unificacao-marca-build-200",
+  "commitBase": "descoberta-automatica-zero-friccao",
+  "descoberta": {
+    "servico": "estudio-reis-descoberta",
+    "arquivo": "motor.json",
+    "renovacaoSegundos": 300,
+    "frescorMs": 720000
+  },
   "repositorios": {
     "base": "Est-dio-Reis-atualiza-o",
     "marca": "studio-reis-canvas",

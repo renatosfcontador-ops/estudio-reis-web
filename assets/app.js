@@ -1,6 +1,5 @@
 const $ = (id) => document.getElementById(id);
 
-const KEY_CONFIG = 'er.config.v1';
 const KEY_JOBS = 'er.jobs.v1';
 const KEY_SESSION = 'er.session.v1';
 const LOGIN_EMAIL = 'renato.sf.contador@gmail.com';
@@ -8,6 +7,10 @@ const PASS_HASH = 'e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3a
 const MAX_REF_BYTES = 650 * 1024;
 const MAX_PROMPT = 1400;
 const POLL_MS = 2000;
+const DESCOBERTA_MS = 8000;
+const FRESCOR_MS = 12 * 60 * 1000;
+const DESCOBERTA_URL =
+  'https://raw.githubusercontent.com/renatosfcontador-ops/estudio-reis-descoberta/main/motor.json';
 
 const STYLES = {
   realista: { label: 'Realista', suffix: 'realistic, natural lighting, cinematic, high detail' },
@@ -28,24 +31,13 @@ const ESTADOS = {
   cancelado: { label: 'Cancelado', badge: 'Cancelado', cls: '' },
 };
 
-let config = loadConfig();
 let jobs = loadJobs();
 let activeId = null;
 let pollTimer = null;
 let ref = null;
-
-function loadConfig() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY_CONFIG) || '{}');
-    return { url: String(raw.url || ''), token: String(raw.token || '') };
-  } catch {
-    return { url: '', token: '' };
-  }
-}
-
-function persistConfig() {
-  localStorage.setItem(KEY_CONFIG, JSON.stringify(config));
-}
+let motor = null;
+let motorTimer = null;
+let pendente = null;
 
 function loadJobs() {
   try {
@@ -65,11 +57,11 @@ function persistJobs() {
 }
 
 function apiBase() {
-  return config.url.replace(/\/+$/, '');
+  return motor ? motor.url.replace(/\/+$/, '') : '';
 }
 
 function authHeaders() {
-  return config.token ? { Authorization: `Bearer ${config.token}` } : {};
+  return motor && motor.token ? { Authorization: `Bearer ${motor.token}` } : {};
 }
 
 let toastTimer;
@@ -82,6 +74,7 @@ function toast(msg) {
 }
 
 async function api(path, options = {}) {
+  if (!motor) throw new Error('motor indisponível');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeout || 20000);
   try {
@@ -100,7 +93,7 @@ async function api(path, options = {}) {
     return { ok: res.ok, status: res.status, data };
   } catch (err) {
     const aborted = err && err.name === 'AbortError';
-    throw new Error(aborted ? 'O motor demorou demais para responder.' : 'Não consegui falar com o motor (rede ou CORS).');
+    throw new Error(aborted ? 'O motor demorou demais para responder.' : 'Sem conexão com o motor.');
   } finally {
     clearTimeout(timer);
   }
@@ -108,11 +101,62 @@ async function api(path, options = {}) {
 
 function friendlyError(status, data) {
   const detail = (data && (data.detail || data.erro || data.error)) || '';
-  if (status === 401) return 'Token do motor inválido. Confira em Configurações.';
-  if (status === 404) return 'Motor não encontrado nesse endereço. Confira a URL.';
+  if (status === 401) return 'O motor recusou a sessão. Tente novamente.';
+  if (status === 404) return 'O pedido não foi encontrado no motor.';
   if (status === 400) return detail || 'O pedido foi recusado pelo motor.';
   if (status >= 500) return detail || 'O motor teve uma falha interna.';
   return detail || `Falha inesperada (HTTP ${status}).`;
+}
+
+/* ── descoberta automática do motor ─────────────────────── */
+
+function statusMotor(ok) {
+  const note = $('motor-note');
+  if (!note) return;
+  note.hidden = Boolean(ok);
+  if (!ok) {
+    $('motor-note-text').textContent = 'Aguardando inicialização do motor…';
+  }
+}
+
+async function descobrirMotor() {
+  try {
+    const res = await fetch(`${DESCOBERTA_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const j = await res.json();
+    if (!j || !j.url || !j.atualizadoEm) return null;
+    if (Date.now() - Number(j.atualizadoEm) > FRESCOR_MS) return null;
+    return { url: String(j.url), token: String(j.token || '') };
+  } catch {
+    return null;
+  }
+}
+
+async function cicloMotor() {
+  const novo = await descobrirMotor();
+  const mudou = Boolean(novo) && (!motor || novo.url !== motor.url);
+  motor = novo;
+  statusMotor(Boolean(novo));
+
+  if (mudou) {
+    if (pendente) {
+      const p = pendente;
+      pendente = null;
+      enviarPedido(p);
+    } else if (!activeId) {
+      const retomavel = jobs.find((j) => j.estado === 'na-fila' || j.estado === 'renderizando');
+      if (retomavel) {
+        activeId = retomavel.id;
+        startPolling(retomavel.id);
+      }
+    }
+  }
+}
+
+function iniciarDescoberta() {
+  cicloMotor();
+  if (motorTimer) clearInterval(motorTimer);
+  motorTimer = setInterval(cicloMotor, DESCOBERTA_MS);
 }
 
 /* ── imagem de referência ───────────────────────────────── */
@@ -197,13 +241,12 @@ function autoGrow() {
 
 /* ── criação ────────────────────────────────────────────── */
 
-function buildPayload(text) {
-  const styleKey = $('style').value;
-  const style = STYLES[styleKey] || STYLES.realista;
-  const montado = `${text}, ${style.suffix}`;
+function buildPayload(p) {
+  const style = STYLES[p.estilo] || STYLES.realista;
+  const montado = `${p.text}, ${style.suffix}`;
   const payload = {
     prompt: { montado: montado.slice(0, MAX_PROMPT), negativo: NEGATIVE },
-    cena: { proporcao: $('aspect').value, duracaoSegundos: Number($('duration').value) || 5 },
+    cena: { proporcao: p.proporcao, duracaoSegundos: p.duracao },
     qualidade: { steps: 30, pesoAtencao: 5.0 },
     referencias: { itens: [] },
   };
@@ -214,38 +257,52 @@ function buildPayload(text) {
   return payload;
 }
 
-async function create() {
+function coletarPedido() {
   const text = $('prompt').value.trim();
   if (text.length < 4) {
     toast('Conte um pouco mais da cena.');
     $('prompt').focus();
-    return;
+    return null;
   }
-  if (!config.url) {
-    toast('Configure o motor de vídeo para criar.');
-    openSettings();
-    return;
-  }
+  return {
+    text,
+    estilo: $('style').value,
+    proporcao: $('aspect').value,
+    duracao: Number($('duration').value) || 5,
+  };
+}
 
-  $('btn-create').disabled = true;
-  const original = $('btn-create').innerHTML;
-  $('btn-create').textContent = 'Enviando…';
-  showJobPlaceholder(text);
+function create() {
+  const p = coletarPedido();
+  if (!p) return;
+  if (!motor) {
+    pendente = p;
+    statusMotor(false);
+    toast('Aguardando inicialização do motor…');
+    return;
+  }
+  enviarPedido(p);
+}
+
+async function enviarPedido(p) {
+  const botao = $('btn-create');
+  const original = botao.innerHTML;
+  botao.disabled = true;
+  botao.textContent = 'Enviando…';
+  showJobPlaceholder(p.text);
 
   try {
     const { ok, status, data } = await api('/api/render', {
       method: 'POST',
-      body: JSON.stringify({ payload: buildPayload(text) }),
+      body: JSON.stringify({ payload: buildPayload(p) }),
     });
-    if (!ok || !data || !data.id) {
-      throw new Error(friendlyError(status, data));
-    }
+    if (!ok || !data || !data.id) throw new Error(friendlyError(status, data));
     const entry = {
       id: data.id,
-      titulo: text,
-      estilo: $('style').value,
-      proporcao: $('aspect').value,
-      duracao: Number($('duration').value) || 5,
+      titulo: p.text,
+      estilo: p.estilo,
+      proporcao: p.proporcao,
+      duracao: p.duracao,
       criadoEm: new Date().toISOString(),
       estado: data.estado || 'na-fila',
       progresso: 0,
@@ -260,10 +317,13 @@ async function create() {
     updateJobView(entry);
     startPolling(data.id);
   } catch (err) {
-    showJobError(err.message || 'Não foi possível enviar o pedido.');
+    pendente = p;
+    statusMotor(false);
+    show('welcome');
+    toast('Aguardando inicialização do motor…');
   } finally {
-    $('btn-create').disabled = false;
-    $('btn-create').innerHTML = original;
+    botao.disabled = false;
+    botao.innerHTML = original;
   }
 }
 
@@ -353,7 +413,7 @@ function stopPolling() {
 
 async function poll(id) {
   if (activeId && activeId !== id) return;
-  let j = findJob(id);
+  const j = findJob(id);
   if (!j) return;
   try {
     const { ok, status, data } = await api(`/api/render/${encodeURIComponent(id)}`, { timeout: 15000 });
@@ -385,7 +445,7 @@ async function poll(id) {
       activeId = null;
     }
     updateJobView(j);
-  } catch (err) {
+  } catch {
     j.etapa = 'Reconectando ao motor…';
     updateJobView(j);
   }
@@ -519,89 +579,30 @@ function openHistory(j) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-/* ── configurações / motor ──────────────────────────────── */
+/* ── login unificado ────────────────────────────────────── */
 
-function openSettings() {
-  $('cfg-url').value = config.url;
-  $('cfg-token').value = config.token;
-  $('cfg-test').hidden = true;
-  $('dialog-settings').showModal();
-  setTimeout(() => $('cfg-url').focus(), 50);
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function closeSettings() {
-  $('dialog-settings').close();
+function showLogin() {
+  stopPolling();
+  activeId = null;
+  $('app-shell').hidden = true;
+  $('login').hidden = false;
+  $('login-erro').textContent = '';
+  $('login-pass').value = '';
+  setTimeout(() => $('login-email').focus(), 60);
 }
 
-async function testMotor() {
-  const url = $('cfg-url').value.trim().replace(/\/+$/, '');
-  const token = $('cfg-token').value.trim();
-  const box = $('cfg-test');
-  box.hidden = false;
-  box.className = 'test-result';
-  box.textContent = 'Testando…';
-  if (!url) {
-    box.classList.add('ruim');
-    box.textContent = 'Informe o endereço do motor.';
-    return;
-  }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
-  try {
-    const headers = token ? { Authorization: `Bearer ${token}` } : { accept: 'application/json' };
-    const res = await fetch(url + '/healthz', { headers, signal: controller.signal });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const modelo = data.modelo || 'desconhecido';
-    const fila = data.fila ? ` · ${data.fila.naFila || 0} na fila` : '';
-    box.classList.add('ok');
-    box.textContent = `Motor online · ${modelo}${fila}`;
-  } catch (err) {
-    const aborted = err && err.name === 'AbortError';
-    box.classList.add('ruim');
-    box.textContent = aborted ? 'Sem resposta em 10 s.' : 'Não respondeu (URL, rede ou CORS).';
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function saveConfig() {
-  const url = $('cfg-url').value.trim().replace(/\/+$/, '');
-  const token = $('cfg-token').value.trim();
-  config = { url, token };
-  persistConfig();
-  closeSettings();
-  refreshMotorNote();
-  toast(url ? 'Motor salvo.' : 'Motor removido.');
-}
-
-async function refreshMotorNote() {
-  const note = $('motor-note');
-  const text = $('motor-note-text');
-  if (!config.url) {
-    note.hidden = false;
-    note.className = 'motor-note';
-    text.textContent = 'Configure o motor de vídeo para começar.';
-    $('motor-note-btn').textContent = 'Configurar';
-    return;
-  }
-  note.hidden = false;
-  note.className = 'motor-note';
-  text.textContent = 'Consultando o motor…';
-  $('motor-note-btn').textContent = 'Configurar';
-  try {
-    const { ok, data } = await api('/healthz', { timeout: 10000 });
-    if (ok && data && data.ok) {
-      note.className = 'motor-note ok';
-      text.textContent = `Motor online · ${data.modelo || 'Wan'}`;
-    } else {
-      note.className = 'motor-note ruim';
-      text.textContent = 'Motor configurado, mas sem resposta agora.';
-    }
-  } catch {
-    note.className = 'motor-note ruim';
-    text.textContent = 'Motor configurado, mas sem resposta agora.';
-  }
+function boot() {
+  $('login').hidden = true;
+  $('app-shell').hidden = false;
+  autoGrow();
+  show('welcome');
+  statusMotor(false);
+  iniciarDescoberta();
 }
 
 /* ── eventos ────────────────────────────────────────────── */
@@ -629,8 +630,7 @@ $('ref-input').addEventListener('change', async (e) => {
   e.target.value = '';
   if (!file) return;
   try {
-    const prepared = await prepareImage(file);
-    setRef(prepared);
+    setRef(await prepareImage(file));
   } catch (err) {
     toast(err.message || 'Não consegui usar essa imagem.');
   }
@@ -654,58 +654,15 @@ $('btn-library').addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-$('btn-settings').addEventListener('click', openSettings);
-$('motor-note-btn').addEventListener('click', openSettings);
-$('settings-close').addEventListener('click', closeSettings);
-$('cfg-cancel').addEventListener('click', closeSettings);
-$('cfg-save').addEventListener('click', saveConfig);
-$('cfg-test-btn').addEventListener('click', testMotor);
-
-$('dialog-settings').addEventListener('click', (e) => {
-  if (e.target === $('dialog-settings')) closeSettings();
-});
-
 $('btn-logout').addEventListener('click', () => {
   localStorage.removeItem(KEY_SESSION);
-  closeSettings();
+  if (motorTimer) clearInterval(motorTimer);
   showLogin();
 });
 
 window.addEventListener('beforeunload', () => {
   persistJobs();
 });
-
-/* ── login unificado ────────────────────────────────────── */
-
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-function showLogin() {
-  stopPolling();
-  activeId = null;
-  $('app-shell').hidden = true;
-  $('login').hidden = false;
-  $('login-erro').textContent = '';
-  $('login-pass').value = '';
-  setTimeout(() => $('login-email').focus(), 60);
-}
-
-function boot() {
-  $('login').hidden = true;
-  $('app-shell').hidden = false;
-  $('session-email').textContent = LOGIN_EMAIL;
-  autoGrow();
-  show('welcome');
-  refreshMotorNote();
-
-  const retomavel = jobs.find((j) => j.estado === 'na-fila' || j.estado === 'renderizando');
-  if (retomavel && config.url) {
-    activeId = retomavel.id;
-    startPolling(retomavel.id);
-  }
-}
 
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();

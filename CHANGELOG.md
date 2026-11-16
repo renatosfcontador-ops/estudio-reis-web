@@ -2,6 +2,21 @@
 
 Formato: Keep a Changelog · Versões seguem `version.json` (a build de número MAIOR é a soberana).
 
+## [2.0.1] — build 201 — 2026-11-16
+
+### Corrigido
+- **Removido o modal de infraestrutura** (URL/token do motor). O usuário final e o Gestor
+  nunca veem configuração de túnel, endereço do Kaggle ou token.
+- **Descoberta automática do motor (zero fricção)**: o notebook registra o endpoint ativo no
+  serviço `estudio-reis-descoberta` (JSON público, renovado a cada 5 min). O front-end lê em
+  segundo plano e conecta sozinho.
+- **Fallback elegante**: motor offline/iniciando → apenas “Aguardando inicialização do
+  motor…”. “Criar Vídeo” fica pendente e é enviado automaticamente quando o motor aparece.
+- **Logout** passou para o botão **Sair** no cabeçalho (o modal de configurações foi excluído).
+
+### Alterado
+- `version.json` → `v2.0.1` (build 201).
+
 ## [2.0.0] — build 200 — 2026-11-16
 
 ### Adicionado
