@@ -2,6 +2,24 @@
 
 Formato: Keep a Changelog · Versões seguem `version.json` (a build de número MAIOR é a soberana).
 
+## [2.5.0] — build 250 — 2026-11-16
+
+### Adicionado
+- **Elenco 1–5 personagens** no Canvas: cards expansíveis com nome, papel (protagonista/antagonista/
+  apoio), traços/roupa, consistência e **7 ângulos de referência** por personagem (frente, costas,
+  perfil esquerdo/direito, cima, baixo e close nos olhos).
+- **Voz / Narração**: painel com TTS de prévia (Web Speech API), seleção de voz e velocidade; a
+  narração entra em `roteiro.narracao` e é enviada ao motor.
+- **Descoberta multi-engine**: `motor.json` aceita `engines[]`; o front-end usa o primeiro motor
+  disponível e mostra a contagem.
+- **Status híbrido em tempo real**: “Modo híbrido · chat ativo · mm:ss” (sem mensagem estática).
+- **Relatório de varredura** `docs/ECOSSISTEMA-MULTI-MOTOR.md` (vídeo, voz, imagem, consistência).
+
+### Alterado
+- Payload agora inclui `elenco[]`, `roteiro.narracao` e usa o 1º plano frontal do protagonista como
+  referência I2V.
+- `version.json` → `v2.5.0` (build 250). Assets `?v=250`.
+
 ## [2.4.0] — build 240 — 2026-11-16
 
 ### Adicionado

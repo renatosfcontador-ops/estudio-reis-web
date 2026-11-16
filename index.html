@@ -11,7 +11,7 @@
   <link rel="icon" href="/brand/icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/brand/icons/apple-touch-icon.png">
   <link rel="manifest" href="/brand/manifest.webmanifest">
-  <link rel="stylesheet" href="/assets/styles.css?v=240">
+  <link rel="stylesheet" href="/assets/styles.css?v=250">
 </head>
 <body>
   <!-- ═══════════ Login unificado (Grupo Reis) ═══════════ -->
@@ -113,31 +113,13 @@
           <div class="node-body">
 
             <div class="subpanel">
-              <h3><span class="n">1</span> Protagonista</h3>
-              <div class="fld-row">
-                <label class="fld"><span>Nome</span><input id="prot-nome" type="text" maxlength="80" placeholder="Ex.: Antenor"></label>
-                <label class="fld"><span>Consistência</span>
-                  <select id="prot-consistencia">
-                    <option value="consistente">Manter consistente</option>
-                    <option value="livre">Variação livre</option>
-                  </select>
-                </label>
-              </div>
-              <label class="fld"><span>Traços físicos</span><input id="prot-tracos" type="text" maxlength="160" placeholder="Ex.: menino 3D, óculos redondos, cabelo castanho"></label>
-              <label class="fld"><span>Vestimenta</span><input id="prot-roupa" type="text" maxlength="160" placeholder="Ex.: moletom amarelo, calça azul-marinho"></label>
+              <h3><span class="n">1</span> Elenco <em>1–5 personagens</em></h3>
+              <p class="hint">Cada personagem aceita até 7 ângulos: frente, costas, perfil esquerdo/direito, olhando para cima/baixo e close nos olhos.</p>
+              <div id="elenco" class="elenco"></div>
             </div>
 
             <div class="subpanel">
-              <h3><span class="n">2</span> Antagonista <em>opcional</em></h3>
-              <div class="fld-row">
-                <label class="fld"><span>Nome</span><input id="ant-nome" type="text" maxlength="80" placeholder="Ex.: Robô rival"></label>
-                <label class="fld"><span>Traços físicos</span><input id="ant-tracos" type="text" maxlength="160" placeholder="Ex.: armadura escura, olhos vermelhos"></label>
-              </div>
-              <label class="fld"><span>Vestimenta</span><input id="ant-roupa" type="text" maxlength="160" placeholder="Ex.: capa metálica"></label>
-            </div>
-
-            <div class="subpanel">
-              <h3><span class="n">3</span> Cena</h3>
+              <h3><span class="n">2</span> Cena</h3>
               <label class="fld"><span>Descrição da cena</span><textarea id="cena" rows="4" maxlength="1200" placeholder="Descreva a ação, o cenário e a câmera…"></textarea></label>
               <div class="fld-row">
                 <label class="fld"><span>Estilo visual</span>
@@ -154,6 +136,20 @@
               <label class="fld"><span>Modificadores</span><input id="lora" type="text" maxlength="200" placeholder="Ex.: lens 35mm, neon, slow motion"></label>
               <label class="fld"><span>Prompt positivo <em>opcional</em></span><textarea id="positivo" rows="2" maxlength="800" placeholder="Refinamento do que deve aparecer…"></textarea></label>
               <label class="fld"><span>Prompt negativo</span><textarea id="negativo" rows="2" maxlength="500"></textarea></label>
+            </div>
+
+            <div class="subpanel">
+              <h3><span class="n">3</span> Voz / Narração <em>preview</em></h3>
+              <label class="fld"><span>Narração</span><textarea id="narracao" rows="3" maxlength="800" placeholder="Texto que será narrado (entra no roteiro e pode ser ouvido aqui)…"></textarea></label>
+              <div class="fld-row">
+                <label class="fld"><span>Voz</span><select id="voz"></select></label>
+                <label class="fld"><span>Velocidade</span><input id="voz-rate" type="range" min="0.5" max="2" step="0.1" value="1"></label>
+              </div>
+              <div class="row-inline">
+                <button type="button" class="btn" id="voz-ouvir">▶ Ouvir</button>
+                <button type="button" class="btn ghost" id="voz-parar" hidden>■ Parar</button>
+                <span class="hint" id="voz-status">prévia local (Web Speech)</span>
+              </div>
             </div>
 
           </div>
@@ -320,6 +316,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="/assets/app.js?v=240"></script>
+  <script type="module" src="/assets/app.js?v=250"></script>
 </body>
 </html>

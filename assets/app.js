@@ -44,6 +44,25 @@ let modo = 't2v';
 let aspect = '16:9';
 let modoAtual = 'chat';
 let chatHistory = [];
+let offlineDesde = null;
+let hybridTimer = null;
+
+const ANGLES = [
+  ['frente', 'Frente'],
+  ['costas', 'Costas'],
+  ['esq', 'Esg'],
+  ['dir', 'Dir'],
+  ['cima', 'Cima'],
+  ['baixo', 'Baixo'],
+  ['olhos', 'Olhos'],
+];
+const charState = Array.from({ length: 5 }, (_, i) => ({
+  nome: '',
+  papel: i === 0 ? 'protagonista' : i === 1 ? 'antagonista' : 'apoio',
+  desc: '',
+  consistencia: 'consistente',
+  angles: {},
+}));
 
 function loadJobs() {
   try {
@@ -120,6 +139,12 @@ let lastMotorOk = null;
 function statusMotor(ok) {
   if (ok === lastMotorOk && $('motor-state')) return;
   lastMotorOk = ok;
+  if (ok) {
+    offlineDesde = null;
+    stopHybridTimer();
+  } else if (!offlineDesde) {
+    offlineDesde = Date.now();
+  }
   const pill = $('motor-pill');
   if (pill) {
     pill.className = 'status-pill ' + (ok ? 'ok' : 'hybrid');
@@ -129,9 +154,33 @@ function statusMotor(ok) {
   if (st) {
     st.className = 'motor-state ' + (ok ? 'ok' : 'hybrid');
     $('motor-state-text').textContent = ok ? 'Pronto para renderizar' : 'Motor em inicialização';
-    $('motor-sub').textContent = ok
-      ? `${motor && motor.modelo ? motor.modelo : 'wan2.1'} · GPU · S3 24h`
-      : 'chat e prompts ativos · vídeo entra na fila ao subir';
+    if (ok) {
+      const extra = motor && motor.total > 1 ? `${motor.total} motores · ` : '';
+      $('motor-sub').textContent = `${extra}${motor && motor.modelo ? motor.modelo : 'wan2.1'} · S3 24h`;
+    } else {
+      $('motor-sub').textContent = 'Modo híbrido · chat ativo';
+    }
+  }
+  if (!ok) startHybridTimer();
+}
+
+function startHybridTimer() {
+  if (hybridTimer) return;
+  const tick = () => {
+    if (!offlineDesde || !$('motor-sub')) return;
+    const s = Math.floor((Date.now() - offlineDesde) / 1000);
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    $('motor-sub').textContent = `Modo híbrido · chat ativo · ${mm}:${ss}`;
+  };
+  tick();
+  hybridTimer = setInterval(tick, 1000);
+}
+
+function stopHybridTimer() {
+  if (hybridTimer) {
+    clearInterval(hybridTimer);
+    hybridTimer = null;
   }
 }
 
@@ -140,9 +189,17 @@ async function descobrirMotor() {
     const res = await fetch(`${DESCOBERTA_URL}?t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) return null;
     const j = await res.json();
-    if (!j || !j.url || !j.atualizadoEm) return null;
-    if (Date.now() - Number(j.atualizadoEm) > FRESCOR_MS) return null;
-    return { url: String(j.url), token: String(j.token || '') };
+    if (!j) return null;
+    const atualizado = Number(j.atualizadoEm) || 0;
+    if (atualizado && Date.now() - atualizado > FRESCOR_MS) return null;
+    let lista = [];
+    if (Array.isArray(j.engines) && j.engines.length) {
+      lista = j.engines.filter((e) => e && e.url).map((e) => ({ url: String(e.url), token: String(e.token || '') }));
+    } else if (j.url) {
+      lista = [{ url: String(j.url), token: String(j.token || '') }];
+    }
+    if (!lista.length) return null;
+    return { url: lista[0].url, token: lista[0].token, total: lista.length, modelo: j.modelo || '' };
   } catch {
     return null;
   }
@@ -371,8 +428,9 @@ function levarAoCanvas(a) {
   const estilo = (a && a.estilo) || 'realista';
 
   if (cena) $('cena').value = cena;
-  if (prot) $('prot-nome').value = prot;
-  if (ant) $('ant-nome').value = ant;
+  if (prot) charState[0].nome = prot;
+  if (ant) charState[1].nome = ant;
+  if (prot || ant) montarElenco();
   if (estilo in STYLES) $('estilo').value = estilo;
   if (!$('negativo').value.trim()) $('negativo').value = NEGATIVE;
 
@@ -476,6 +534,150 @@ function setRef(data) {
   $('ref-status').textContent = 'Referência anexada (I2V).';
 }
 
+/* ── elenco (1–5 personagens × 7 ângulos) ───────────────── */
+
+function montarElenco() {
+  const cont = $('elenco');
+  if (!cont) return;
+  cont.replaceChildren();
+
+  const nomes = ['Protagonista', 'Antagonista', 'Apoio 1', 'Apoio 2', 'Apoio 3'];
+  const cores = ['#8a6b24', '#7a4b3a', '#4a6b5a', '#3a5a7a', '#6a4a7a'];
+
+  charState.forEach((c, i) => {
+    const det = document.createElement('details');
+    det.className = 'char';
+    if (i === 0) det.open = true;
+
+    const sum = document.createElement('summary');
+    const cn = document.createElement('span');
+    cn.className = 'cn';
+    cn.textContent = String(i + 1);
+    cn.style.background = cores[i];
+    cn.style.color = '#fff';
+    const name = document.createElement('span');
+    name.className = 'cname';
+    name.textContent = c.nome || nomes[i];
+    const role = document.createElement('span');
+    role.className = 'crole';
+    role.textContent = c.papel;
+    const tog = document.createElement('span');
+    tog.className = 'ctoggle';
+    tog.textContent = '▾';
+    sum.append(cn, name, role, tog);
+
+    const body = document.createElement('div');
+    body.className = 'char-body';
+
+    const row = document.createElement('div');
+    row.className = 'fld-row';
+
+    const wrapNome = document.createElement('label');
+    wrapNome.className = 'fld';
+    const spanNome = document.createElement('span');
+    spanNome.textContent = 'Nome';
+    const inNome = document.createElement('input');
+    inNome.type = 'text';
+    inNome.maxLength = 80;
+    inNome.placeholder = 'Nome do personagem';
+    inNome.value = c.nome;
+    inNome.addEventListener('input', () => {
+      c.nome = inNome.value;
+      name.textContent = inNome.value || nomes[i];
+    });
+    wrapNome.append(spanNome, inNome);
+
+    const wrapPapel = document.createElement('label');
+    wrapPapel.className = 'fld';
+    const spanPapel = document.createElement('span');
+    spanPapel.textContent = 'Papel';
+    const selPapel = document.createElement('select');
+    [['protagonista', 'Protagonista'], ['antagonista', 'Antagonista'], ['apoio', 'Apoio']].forEach(([v, t]) => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = t;
+      selPapel.append(o);
+    });
+    selPapel.value = c.papel;
+    selPapel.addEventListener('change', () => {
+      c.papel = selPapel.value;
+      role.textContent = c.papel;
+    });
+    wrapPapel.append(spanPapel, selPapel);
+    row.append(wrapNome, wrapPapel);
+
+    const wrapDesc = document.createElement('label');
+    wrapDesc.className = 'fld';
+    const spanDesc = document.createElement('span');
+    spanDesc.textContent = 'Traços / roupa';
+    const inDesc = document.createElement('input');
+    inDesc.type = 'text';
+    inDesc.maxLength = 200;
+    inDesc.placeholder = 'Ex.: menino 3D, óculos, moletom amarelo';
+    inDesc.value = c.desc;
+    inDesc.addEventListener('input', () => {
+      c.desc = inDesc.value;
+    });
+    wrapDesc.append(spanDesc, inDesc);
+
+    const wrapCons = document.createElement('label');
+    wrapCons.className = 'fld';
+    const spanCons = document.createElement('span');
+    spanCons.textContent = 'Consistência';
+    const selCons = document.createElement('select');
+    [['consistente', 'Manter consistente'], ['livre', 'Variação livre']].forEach(([v, t]) => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = t;
+      selCons.append(o);
+    });
+    selCons.value = c.consistencia || 'consistente';
+    selCons.addEventListener('change', () => {
+      c.consistencia = selCons.value;
+    });
+    wrapCons.append(spanCons, selCons);
+
+    const angles = document.createElement('div');
+    angles.className = 'angles';
+    ANGLES.forEach(([slot, rot]) => {
+      const lab = document.createElement('label');
+      lab.className = 'angle';
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = 'image/*';
+      inp.hidden = true;
+      const img = document.createElement('img');
+      img.alt = rot;
+      const sp = document.createElement('span');
+      sp.textContent = rot;
+      lab.append(inp, img, sp);
+
+      if (c.angles[slot]) {
+        img.src = c.angles[slot].dataUrl;
+        lab.classList.add('tem');
+      }
+      inp.addEventListener('change', async () => {
+        const f = inp.files && inp.files[0];
+        inp.value = '';
+        if (!f) return;
+        try {
+          const prep = await prepareImage(f);
+          c.angles[slot] = { dataUrl: prep.dataUrl, name: f.name };
+          img.src = prep.dataUrl;
+          lab.classList.add('tem');
+        } catch (err) {
+          toast(err.message || 'Não consegui usar a imagem.');
+        }
+      });
+      angles.append(lab);
+    });
+
+    body.append(row, wrapDesc, wrapCons, angles);
+    det.append(sum, body);
+    cont.append(det);
+  });
+}
+
 /* ── leitura dos nós ────────────────────────────────────── */
 
 function coletarPedido() {
@@ -486,24 +688,30 @@ function coletarPedido() {
     setTimeout(() => $('cena').focus(), 350);
     return null;
   }
+
+  const elenco = charState
+    .filter((c) => c.nome || c.desc || Object.keys(c.angles || {}).length)
+    .map((c) => ({
+      nome: c.nome || '',
+      papel: c.papel || 'apoio',
+      desc: c.desc || '',
+      consistencia: c.consistencia || 'consistente',
+      angulos: Object.keys(c.angles || {}),
+    }));
+
+  const prot = charState.find((c) => c.papel === 'protagonista' && c.angles && c.angles.frente);
+  const referencia = prot ? { dataUrl: prot.angles.frente.dataUrl, name: 'protagonista-frente' } : ref;
+
   return {
-    prot: {
-      nome: $('prot-nome').value.trim(),
-      tracos: $('prot-tracos').value.trim(),
-      roupa: $('prot-roupa').value.trim(),
-      consistencia: $('prot-consistencia').value,
-    },
-    ant: {
-      nome: $('ant-nome').value.trim(),
-      tracos: $('ant-tracos').value.trim(),
-      roupa: $('ant-roupa').value.trim(),
-    },
+    elenco,
+    referencia,
     cena,
     estilo: $('estilo').value,
     positivo: $('positivo').value.trim(),
     negativo: $('negativo').value.trim(),
     lora: $('lora').value.trim(),
     loraNome: $('lora-nome').value.trim(),
+    narracao: $('narracao').value.trim(),
     modo,
     aspect,
     duration: Number($('duration').value) || 5,
@@ -516,10 +724,13 @@ function buildPayload(p) {
   const estilo = STYLES[p.estilo] || STYLES.realista;
   const partes = [];
 
-  const prot = [p.prot.nome, p.prot.tracos, p.prot.roupa].filter(Boolean).join(', ');
-  if (prot) partes.push(`Protagonista: ${prot}${p.prot.consistencia === 'consistente' ? ', aparência consistente' : ''}`);
-  const ant = [p.ant.nome, p.ant.tracos, p.ant.roupa].filter(Boolean).join(', ');
-  if (ant) partes.push(`Antagonista: ${ant}`);
+  (p.elenco || []).forEach((c) => {
+    const d = [c.nome, c.desc].filter(Boolean).join(' - ');
+    if (d) {
+      const cons = c.consistencia === 'consistente' ? ', aparência consistente' : '';
+      partes.push(`Personagem (${c.papel}): ${d}${cons}`);
+    }
+  });
 
   partes.push(p.cena);
   if (p.positivo) partes.push(p.positivo);
@@ -534,10 +745,13 @@ function buildPayload(p) {
     },
     cena: { proporcao: p.aspect, duracaoSegundos: p.duration },
     qualidade: { steps: p.steps, pesoAtencao: 5.0, seed: p.seed || 0 },
+    roteiro: { narracao: p.narracao || '' },
+    elenco: p.elenco || [],
     referencias: { itens: [] },
   };
-  if (p.modo === 'i2v' && ref) {
-    payload.referenciaBase64 = ref.dataUrl;
+
+  if (p.modo === 'i2v' && p.referencia) {
+    payload.referenciaBase64 = p.referencia.dataUrl;
     payload.referencias.itens.push({ papel: 'protagonista', ativa: true, url: '' });
   }
   return payload;
@@ -549,6 +763,69 @@ function atualizarReadout() {
   const frames = Math.round((d * 16) / 4) * 4 + 1;
   $('frames-readout').textContent = String(frames);
   $('res-hint').textContent = `${aspect} · ${w}×${h}`;
+}
+
+/* ── voz / narração (Web Speech) ────────────────────────── */
+
+function montarVozes() {
+  const sel = $('voz');
+  if (!sel) return;
+  sel.replaceChildren();
+  if (!('speechSynthesis' in window)) {
+    const o = document.createElement('option');
+    o.textContent = 'Sem suporte';
+    sel.append(o);
+    return;
+  }
+  const vozes = window.speechSynthesis.getVoices();
+  const pref = vozes.filter((v) => /^pt/i.test(v.lang));
+  const lista = pref.length ? pref : vozes;
+  if (!lista.length) {
+    const o = document.createElement('option');
+    o.textContent = 'Voz padrão';
+    sel.append(o);
+    return;
+  }
+  lista.forEach((v) => {
+    const o = document.createElement('option');
+    o.value = v.name;
+    o.textContent = `${v.name} (${v.lang})`;
+    sel.append(o);
+  });
+}
+
+function ouvirNarracao() {
+  if (!('speechSynthesis' in window)) {
+    toast('Este navegador não tem síntese de voz.');
+    return;
+  }
+  const texto = $('narracao').value.trim();
+  if (!texto) {
+    toast('Escreva a narração.');
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(texto);
+  const nome = $('voz').value;
+  const v = window.speechSynthesis.getVoices().find((x) => x.name === nome);
+  if (v) u.voice = v;
+  u.rate = Number($('voz-rate').value) || 1;
+  u.lang = (v && v.lang) || 'pt-BR';
+  u.onend = () => {
+    $('voz-parar').hidden = true;
+  };
+  u.onerror = () => {
+    $('voz-parar').hidden = true;
+  };
+  $('voz-parar').hidden = false;
+  $('voz-status').textContent = 'Reproduzindo…';
+  window.speechSynthesis.speak(u);
+}
+
+function pararNarracao() {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  $('voz-parar').hidden = true;
+  $('voz-status').textContent = 'prévia local (Web Speech)';
 }
 
 /* ── criação ────────────────────────────────────────────── */
@@ -593,8 +870,8 @@ async function enviarPedido(p) {
     const entry = {
       id: data.id,
       titulo: p.cena,
-      prot: p.prot,
-      ant: p.ant,
+      elenco: p.elenco,
+      narracao: p.narracao,
       estilo: p.estilo,
       positivo: p.positivo,
       negativo: p.negativo,
@@ -812,17 +1089,17 @@ function renderLibrary() {
       again.textContent = '↻ Reenviar';
       again.onclick = () => {
         $('cena').value = j.titulo || '';
-        if (j.prot) {
-          $('prot-nome').value = j.prot.nome || '';
-          $('prot-tracos').value = j.prot.tracos || '';
-          $('prot-roupa').value = j.prot.roupa || '';
-          $('prot-consistencia').value = j.prot.consistencia || 'consistente';
+        if (Array.isArray(j.elenco)) {
+          j.elenco.forEach((e, i) => {
+            if (!charState[i]) return;
+            charState[i].nome = e.nome || '';
+            charState[i].papel = e.papel || charState[i].papel;
+            charState[i].desc = e.desc || '';
+            charState[i].consistencia = e.consistencia || 'consistente';
+          });
+          montarElenco();
         }
-        if (j.ant) {
-          $('ant-nome').value = j.ant.nome || '';
-          $('ant-tracos').value = j.ant.tracos || '';
-          $('ant-roupa').value = j.ant.roupa || '';
-        }
+        $('narracao').value = j.narracao || '';
         $('estilo').value = j.estilo || 'realista';
         $('positivo').value = j.positivo || '';
         $('negativo').value = j.negativo || NEGATIVE;
@@ -870,6 +1147,8 @@ function boot() {
   $('login').hidden = true;
   $('app-shell').hidden = false;
   if (!$('negativo').value.trim()) $('negativo').value = NEGATIVE;
+  montarElenco();
+  montarVozes();
   setMode('chat');
   statusMotor(false);
   iniciarDescoberta();
@@ -980,6 +1259,11 @@ function setAspect(v) {
 
 $('duration').addEventListener('change', atualizarReadout);
 $('steps').addEventListener('change', atualizarReadout);
+$('voz-ouvir').addEventListener('click', ouvirNarracao);
+$('voz-parar').addEventListener('click', pararNarracao);
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = montarVozes;
+}
 
 window.addEventListener('resize', () => {
   clearTimeout(window.__erResize);

@@ -1,11 +1,16 @@
 {
   "produto": "Estúdio Reis Atualizado",
-  "versao": "v2.4.0",
-  "BUILD_NUMBER": 240,
+  "versao": "v2.5.0",
+  "BUILD_NUMBER": 250,
   "data": "2026-11-16",
   "branch": "main",
   "publicadoEm": "2026-11-16",
-  "commitBase": "cascata-multi-motor-build-240",
+  "commitBase": "elenco-voz-multi-engine-build-250",
+  "recursos": {
+    "elenco": { "personagens": 5, "angulos": ["frente", "costas", "esq", "dir", "cima", "baixo", "olhos"] },
+    "voz": "Web Speech API (preview local) + roteiro.narracao",
+    "descoberta": "motor.json com engines[] (fallback multi-motor)"
+  },
   "ia": {
     "funcao": "/.netlify/functions/chat",
     "cascata": ["groq", "openrouter", "huggingface", "openai", "gemini"],

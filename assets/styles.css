@@ -366,6 +366,25 @@ a { color: inherit; text-decoration: none; }
 .leaving { opacity: 0; transform: translateY(-8px); }
 .entering { opacity: 0; transform: translateY(8px); }
 
+/* ── elenco / personagens ───────────────────────────────── */
+.elenco { display: flex; flex-direction: column; gap: 8px; }
+.char { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elev); overflow: hidden; }
+.char > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 9px 11px; font-size: 12.5px; font-weight: 600; }
+.char > summary::-webkit-details-marker { display: none; }
+.char > summary .cn { width: 18px; height: 18px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 10.5px; flex: none; }
+.char > summary .cname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.char > summary .crole { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.char > summary .ctoggle { color: var(--muted); font-size: 11px; }
+.char[open] > summary { border-bottom: 1px solid var(--border); }
+.char .char-body { padding: 10px 11px 12px; display: flex; flex-direction: column; gap: 9px; }
+.angles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.angle { position: relative; aspect-ratio: 1; border: 1px dashed var(--border-strong); border-radius: 8px; background: var(--bg); display: grid; place-items: center; cursor: pointer; overflow: hidden; }
+.angle img { width: 100%; height: 100%; object-fit: cover; display: none; }
+.angle.tem img { display: block; }
+.angle span { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: 9px; color: var(--muted); background: color-mix(in srgb, var(--bg) 78%, transparent); }
+.angle:hover { border-color: var(--accent); }
+.row-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
 /* ── responsivo ─────────────────────────────────────────── */
 @media (max-width: 1180px) {
   .canvas { grid-template-columns: 1fr 1fr; }
