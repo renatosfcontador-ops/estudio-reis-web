@@ -22,6 +22,10 @@ Formato: Keep a Changelog · Versões seguem `version.json` (a build de número 
 - Chaves apenas no ambiente do Netlify (`GROQ_API_KEY`, `OPENROUTER_API_KEY`, `HF_API_KEY`,
   `OPENAI_API_KEY`, `GEMINI_API_KEY`); nenhuma chave no front-end.
 
+### Corrigido
+- **Cache busting**: `styles.css`/`app.js` agora usam `?v=240` (builds 230/240 mantinham `?v=220`
+  e o navegador servia o app antigo). O usuário passa a receber o chat com IA e a cascata.
+
 ### Alterado
 - `version.json` → `v2.4.0` (build 240).
 
